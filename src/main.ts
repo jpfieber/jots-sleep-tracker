@@ -131,14 +131,16 @@ export default class SleepTrackerPlugin extends Plugin {
             const sleepMeasurements = await this.googleFitService.getSleepMeasurements(sevenDaysAgo, now);
 
             for (const measurement of sleepMeasurements) {
-                const date = new Date(measurement.date * 1000).toISOString().split('T')[0];
+                // Ensure all timestamps are in seconds
+                const asleepTime = Math.floor(measurement.date);
                 const duration = measurement.sleepDuration || 0;
-                const awakeTime = measurement.date + (duration * 3600);
+                const awakeTime = Math.floor(asleepTime + (duration * 3600));
+                const date = new Date(asleepTime * 1000).toISOString().split('T')[0];
 
                 const record: MeasurementRecord = {
                     date: date,
                     userId: this.settings.defaultUser || this.settings.users[0]?.id || '',
-                    asleepTime: measurement.date.toString(),
+                    asleepTime: asleepTime.toString(),
                     awakeTime: awakeTime.toString(),
                     sleepDuration: duration.toString()
                 };
