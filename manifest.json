@@ -1,0 +1,41 @@
+{
+  "id": "obsidian-sleep-tracker",
+  "name": "Sleep Tracker",
+  "version": "1.0.0",
+  "author": "Your Name",
+  "description": "Track and visualize your sleep patterns in Obsidian with Google Fit integration",
+  "main": "main.js",
+  "stylesheets": [
+    "styles.css"
+  ],
+  "minAppVersion": "0.15.0",
+  "apiVersion": "1.0.0",
+  "permissions": [
+    "read",
+    "write"
+  ],
+  "settings": {
+    "default": {
+      "unit": "cm"
+    }
+  },
+  "authorUrl": "https://your-website.com",
+  "isDesktopOnly": false,
+  "commands": [
+    {
+      "id": "connect-google-fit",
+      "name": "Connect Google Fit Account",
+      "icon": "link"
+    },
+    {
+      "id": "sync-google-fit",
+      "name": "Sync Google Fit Measurements",
+      "icon": "refresh-cw"
+    },
+    {
+      "id": "complete-google-fit-auth",
+      "name": "Complete Google Fit Authentication",
+      "icon": "check"
+    }
+  ]
+}

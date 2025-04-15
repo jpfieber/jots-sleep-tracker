@@ -1,0 +1,142 @@
+.default-user-star {
+    color: gold;
+    margin-left: 8px;
+}
+
+.settings-indent {
+    margin-left: 24px !important;
+}
+
+.settings-separator {
+    border-bottom: 1px solid var(--background-modifier-border);
+    margin: 2em 0;
+}
+
+.measurements-list {
+    margin: 12px 0;
+}
+
+.measurements-list .setting-item {
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    margin: 4px 0;
+    padding: 8px;
+}
+
+.measurements-list .setting-item:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.measurements-table-header {
+    display: grid;
+    grid-template-columns: minmax(150px, 2fr) minmax(150px, 2fr) minmax(100px, 1fr);
+    gap: 12px;
+    padding: 8px;
+    margin-bottom: 8px;
+    font-weight: bold;
+    border-bottom: 1px solid var(--background-modifier-border);
+    align-items: center;
+}
+
+.measurements-table-row {
+    display: grid;
+    grid-template-columns: minmax(100px, 2fr) minmax(100px, 2fr) minmax(100px, 1fr);
+    padding: 2px;
+    margin: 2px 0;
+    align-items: center;
+}
+
+.measurements-table-row:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.measurements-name-cell {
+    font-size: 14px;
+}
+
+.measurements-unit-cell {
+    display: flex;
+    align-items: left;
+}
+
+.measurements-unit-cell .setting-item {
+    margin: 0;
+    padding: 0;
+}
+
+.measurements-controls-cell {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+}
+
+.measurements-add-row {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.measurements-add-row .setting-item-info {
+    display: none;
+}
+
+.measurements-add-row .setting-item-control {
+    display: grid;
+    grid-template-columns: minmax(150px, 2fr) minmax(150px, 2fr) minmax(100px, 1fr);
+    gap: 12px;
+    width: 100%;
+    justify-content: start;
+}
+
+.setting-item-control .clickable-icon {
+    padding: 4px;
+}
+
+.setting-item-control .clickable-icon:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.suggestion-container {
+    position: absolute;
+    z-index: 100;
+    max-height: 300px;
+    overflow-y: auto;
+    background-color: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    box-shadow: 0 2px 8px var(--background-modifier-box-shadow);
+}
+
+.suggestion-item {
+    padding: 6px 12px;
+    cursor: pointer;
+}
+
+.suggestion-item:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.suggestion-item.is-selected {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+/* Style for measurement entries */
+.body-measurement-entry {
+    position: relative;
+    padding-left: 24px;
+    margin: 4px 0;
+}
+
+/* Hide the original task marker */
+.body-measurement-entry .task-list-item-checkbox {
+    display: none;
+}
+
+/* Base styles for measurement entries */
+.markdown-preview-view ul>li.task-list-item {
+    margin: 4px 0;
+}
+
+.markdown-preview-view ul>li.task-list-item input.task-list-item-checkbox {
+    display: none !important;
+}
