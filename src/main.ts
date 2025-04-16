@@ -131,27 +131,45 @@ export default class SleepTrackerPlugin extends Plugin {
             const sleepMeasurements = await this.googleFitService.getSleepMeasurements(sevenDaysAgo, now);
 
             for (const measurement of sleepMeasurements) {
-                // Ensure all timestamps are in seconds
-                const asleepTime = Math.floor(measurement.date);
-                const duration = measurement.sleepDuration || 0;
-                const awakeTime = Math.floor(asleepTime + (duration * 3600));
-                const date = new Date(asleepTime * 1000).toISOString().split('T')[0];
-
-                const record: MeasurementRecord = {
-                    date: date,
+                const moment = (window as any).moment;
+                
+                // Handle sleep (start) time
+                const sleepTimeStr = moment(measurement.startTime * 1000).format('HH:mm');
+                const sleepDateStr = moment(measurement.startTime * 1000).format('YYYY-MM-DD');
+                
+                const sleepRecord: MeasurementRecord = {
+                    date: `${sleepDateStr} ${sleepTimeStr}`,
                     userId: this.settings.defaultUser || this.settings.users[0]?.id || '',
-                    asleepTime: asleepTime.toString(),
-                    awakeTime: awakeTime.toString(),
-                    sleepDuration: duration.toString()
+                    asleepTime: sleepTimeStr
                 };
 
+                // Add sleep record to appropriate date's journal
                 if (this.settings.enableMeasurementFiles) {
-                    await this.measurementService.updateMeasurementFiles(record);
+                    await this.measurementService.updateMeasurementFiles(sleepRecord);
                 }
-
                 if (this.settings.enableJournalEntry) {
                     const journalService = new JournalService(this.app, this.settings);
-                    await journalService.appendToJournal(record);
+                    await journalService.appendToJournal(sleepRecord);
+                }
+
+                // Handle wake (end) time
+                const wakeTimeStr = moment(measurement.endTime * 1000).format('HH:mm');
+                const wakeDateStr = moment(measurement.endTime * 1000).format('YYYY-MM-DD');
+                
+                const wakeRecord: MeasurementRecord = {
+                    date: `${wakeDateStr} ${wakeTimeStr}`,
+                    userId: this.settings.defaultUser || this.settings.users[0]?.id || '',
+                    awakeTime: wakeTimeStr,
+                    sleepDuration: measurement.sleepDuration?.toFixed(1)
+                };
+
+                // Add wake record to appropriate date's journal
+                if (this.settings.enableMeasurementFiles) {
+                    await this.measurementService.updateMeasurementFiles(wakeRecord);
+                }
+                if (this.settings.enableJournalEntry) {
+                    const journalService = new JournalService(this.app, this.settings);
+                    await journalService.appendToJournal(wakeRecord);
                 }
             }
 

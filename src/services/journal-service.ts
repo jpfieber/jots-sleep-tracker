@@ -10,7 +10,11 @@ export class JournalService {
     constructor(private app: App, private settings: any) { }
 
     private formatTime(timeStr: string): string {
-        return timeStr;
+        // Use moment to parse and format the time to ensure it's in HH:mm format
+        const moment = (window as any).moment;
+        if (!timeStr) return '';
+        const time = moment(timeStr, 'HH:mm');
+        return time.isValid() ? time.format('HH:mm') : timeStr;
     }
 
     private getDateFromDateAndTime(date: string, time: string): string {
@@ -314,12 +318,13 @@ export class JournalService {
             }
 
             const [date, time] = data.date.split(' ');
+            const formattedTime = this.formatTime(time);
             let modifiedContent = false;
 
             if (data.asleepTime) {
                 const entry = this.settings.sleepNoteTemplate
                     .replace('<date>', date)
-                    .replace('<time>', time)
+                    .replace('<time>', formattedTime)
                     .replace('<type>', '💤 Asleep')
                     .replace('<duration>', '') + '\n';
 
@@ -334,7 +339,7 @@ export class JournalService {
                 if (!data.sleepDuration) {
                     const previousSleepTime = await this.findMostRecentSleepTime(date);
                     if (previousSleepTime) {
-                        const durationHours = this.calculateSleepDuration(previousSleepTime, time, date);
+                        const durationHours = this.calculateSleepDuration(previousSleepTime, formattedTime, date);
                         duration = durationHours.toFixed(1);
                     }
                 } else {
@@ -343,7 +348,7 @@ export class JournalService {
 
                 const entry = this.settings.sleepNoteTemplate
                     .replace('<date>', date)
-                    .replace('<time>', time)
+                    .replace('<time>', formattedTime)
                     .replace('<type>', '⏰ Awake')
                     .replace('<duration>', duration) + '\n';
 
@@ -384,30 +389,32 @@ export class JournalService {
 
                 if (data.asleepTime) {
                     const [date, time] = data.date.split(' ');
-                    console.log('JournalService: Adding asleep entry for date:', date, 'time:', time);
+                    const formattedTime = this.formatTime(time);
+                    console.log('JournalService: Adding asleep entry for date:', date, 'time:', formattedTime);
                     const asleepEntry = prefix + this.settings.asleepEntryTemplate
-                        .replace('<time>', time) + '\n';
+                        .replace('<time>', formattedTime) + '\n';
                     console.log('JournalService: Generated asleep entry:', asleepEntry);
                     await this.appendEntry(date, asleepEntry);
                 }
 
                 if (data.awakeTime) {
                     const [date, time] = data.date.split(' ');
+                    const formattedTime = this.formatTime(time);
                     let duration = '0.0';
 
                     if (!data.sleepDuration) {
                         const previousSleepTime = await this.findMostRecentSleepTime(date);
                         if (previousSleepTime) {
-                            const durationHours = this.calculateSleepDuration(previousSleepTime, time, date);
+                            const durationHours = this.calculateSleepDuration(previousSleepTime, formattedTime, date);
                             duration = durationHours.toFixed(1);
                         }
                     } else {
                         duration = data.sleepDuration.toString();
                     }
 
-                    console.log('JournalService: Adding awake entry for date:', date, 'time:', time);
+                    console.log('JournalService: Adding awake entry for date:', date, 'time:', formattedTime);
                     const awakeEntry = prefix + this.settings.awakeEntryTemplate
-                        .replace('<time>', time)
+                        .replace('<time>', formattedTime)
                         .replace('<duration>', duration) + '\n';
                     console.log('JournalService: Generated awake entry:', awakeEntry);
                     await this.appendEntry(date, awakeEntry);

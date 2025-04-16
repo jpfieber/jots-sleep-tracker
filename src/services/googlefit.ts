@@ -1,4 +1,4 @@
-import { requestUrl, Notice } from 'obsidian';
+import { request, Notice } from 'obsidian';
 import type { Settings } from '../types';
 
 interface GoogleFitAuthConfig {
@@ -14,8 +14,24 @@ interface GoogleFitMeasurement {
     bodyFat?: number;
 }
 
+interface GoogleFitSleepSession {
+    activityType: number;
+    startTimeMillis: number;
+    endTimeMillis: number;
+    name: string;
+    description: string;
+    application: { packageName: string };
+    sleepQuality?: number;
+    sleepSegments?: Array<{
+        sleepStage: string;
+        startTimeMillis: number;
+        endTimeMillis: number;
+    }>;
+}
+
 interface GoogleFitSleepMeasurement {
-    date: number;
+    startTime: number;  // Unix timestamp in seconds
+    endTime: number;    // Unix timestamp in seconds
     sleepDuration?: number;
     deepSleep?: number;
     lightSleep?: number;
@@ -90,7 +106,7 @@ export class GoogleFitService {
         }
 
         try {
-            const response = await requestUrl({
+            const response = await request({
                 url: 'https://oauth2.googleapis.com/token',
                 method: 'POST',
                 headers: {
@@ -105,7 +121,7 @@ export class GoogleFitService {
                 }).toString()
             });
 
-            const tokens = response.json;
+            const tokens = JSON.parse(response);
             this.settings.googleAccessToken = tokens.access_token;
             this.settings.googleRefreshToken = tokens.refresh_token;
             this.settings.googleTokenExpiry = Date.now() + (tokens.expires_in * 1000);
@@ -126,7 +142,7 @@ export class GoogleFitService {
 
         if (now >= expiryTime - 60000) { // Refresh if token expires in less than a minute
             try {
-                const response = await requestUrl({
+                const response = await request({
                     url: 'https://oauth2.googleapis.com/token',
                     method: 'POST',
                     headers: {
@@ -140,7 +156,7 @@ export class GoogleFitService {
                     }).toString()
                 });
 
-                const tokens = response.json;
+                const tokens = JSON.parse(response);
                 this.settings.googleAccessToken = tokens.access_token;
                 this.settings.googleTokenExpiry = Date.now() + (tokens.expires_in * 1000);
                 await this.config.onSettingsChange(this.settings);
@@ -168,7 +184,7 @@ export class GoogleFitService {
             });
 
             // Get weight data
-            const weightResponse = await requestUrl({
+            const weightResponse = await request({
                 url: `https://www.googleapis.com/fitness/v1/users/me/dataSources/derived:com.google.weight:com.google.android.gms:merged/datasets/${startTimeNs}-${endTimeNs}`,
                 method: 'GET',
                 headers: {
@@ -177,17 +193,14 @@ export class GoogleFitService {
                 }
             });
 
-            console.log('Google Fit weight response:', {
-                status: weightResponse.status,
-                data: weightResponse.json,
-                url: `https://www.googleapis.com/fitness/v1/users/me/dataSources/derived:com.google.weight:com.google.android.gms:merged/datasets/${startTimeNs}-${endTimeNs}`
-            });
+            const weightData = JSON.parse(weightResponse);
+            console.log('Google Fit weight response:', weightData);
 
             const measurements: GoogleFitMeasurement[] = [];
 
             // Process weight data
-            if (weightResponse.json.point) {
-                for (const point of weightResponse.json.point) {
+            if (weightData.point) {
+                for (const point of weightData.point) {
                     const timestamp = Math.floor(parseInt(point.startTimeNanos) / 1000000000);
                     measurements.push({
                         date: timestamp,
@@ -197,7 +210,7 @@ export class GoogleFitService {
             }
 
             // Get body fat data
-            const bodyFatResponse = await requestUrl({
+            const bodyFatResponse = await request({
                 url: `https://www.googleapis.com/fitness/v1/users/me/dataSources/derived:com.google.body.fat.percentage:com.google.android.gms:merged/datasets/${startTimeNs}-${endTimeNs}`,
                 method: 'GET',
                 headers: {
@@ -206,15 +219,12 @@ export class GoogleFitService {
                 }
             });
 
-            console.log('Google Fit body fat response:', {
-                status: bodyFatResponse.status,
-                data: bodyFatResponse.json,
-                url: `https://www.googleapis.com/fitness/v1/users/me/dataSources/derived:com.google.body.fat.percentage:com.google.android.gms:merged/datasets/${startTimeNs}-${endTimeNs}`
-            });
+            const bodyFatData = JSON.parse(bodyFatResponse);
+            console.log('Google Fit body fat response:', bodyFatData);
 
             // Process body fat data
-            if (bodyFatResponse.json.point) {
-                for (const point of bodyFatResponse.json.point) {
+            if (bodyFatData.point) {
+                for (const point of bodyFatData.point) {
                     const timestamp = Math.floor(parseInt(point.startTimeNanos) / 1000000000);
                     const measurement = measurements.find(m => m.date === timestamp);
 
@@ -245,7 +255,7 @@ export class GoogleFitService {
 
         try {
             // Add weight measurement
-            const weightResponse = await requestUrl({
+            const weightResponse = await request({
                 url: `https://www.googleapis.com/fitness/v1/users/me/dataSources/derived:com.google.weight:com.google.android.gms:merge_weight/datasets/${nanos}-${nanos}`,
                 method: 'PATCH',
                 headers: {
@@ -265,14 +275,12 @@ export class GoogleFitService {
                 })
             });
 
-            console.log('Google Fit weight update response:', {
-                status: weightResponse.status,
-                data: weightResponse.json
-            });
+            const weightData = JSON.parse(weightResponse);
+            console.log('Google Fit weight update response:', weightData);
 
             // Add body fat measurement if provided
             if (bodyFat !== undefined) {
-                const bodyFatResponse = await requestUrl({
+                const bodyFatResponse = await request({
                     url: `https://www.googleapis.com/fitness/v1/users/me/dataSources/derived:com.google.body.fat.percentage:com.google.android.gms:merge_body_fat_percentage/datasets/${nanos}-${nanos}`,
                     method: 'PATCH',
                     headers: {
@@ -292,10 +300,8 @@ export class GoogleFitService {
                     })
                 });
 
-                console.log('Google Fit body fat update response:', {
-                    status: bodyFatResponse.status,
-                    data: bodyFatResponse.json
-                });
+                const bodyFatData = JSON.parse(bodyFatResponse);
+                console.log('Google Fit body fat update response:', bodyFatData);
             }
         } catch (error) {
             console.error('Failed to add Google Fit measurement:', error);
@@ -314,7 +320,7 @@ export class GoogleFitService {
             });
 
             // Get sleep sessions data
-            const sleepResponse = await requestUrl({
+            const sleepResponse = await request({
                 url: `https://www.googleapis.com/fitness/v1/users/me/sessions?startTime=${new Date(startTime * 1000).toISOString()}&endTime=${new Date(endTime * 1000).toISOString()}&activityType=72`,
                 method: 'GET',
                 headers: {
@@ -323,15 +329,20 @@ export class GoogleFitService {
                 }
             });
 
+            const sleepData = JSON.parse(sleepResponse);
             const measurements: GoogleFitSleepMeasurement[] = [];
 
-            if (sleepResponse.json.session) {
-                for (const session of sleepResponse.json.session) {
-                    // Convert milliseconds to seconds for the date
-                    const startDate = Math.floor(session.startTimeMillis / 1000);
+            if (sleepData.session) {
+                for (const session of sleepData.session) {
+                    // Convert milliseconds to seconds
+                    const startTimeSeconds = Math.floor(session.startTimeMillis / 1000);
+                    const endTimeSeconds = Math.floor(session.endTimeMillis / 1000);
+                    const duration = (session.endTimeMillis - session.startTimeMillis) / (1000 * 60 * 60); // Convert to hours
+
                     measurements.push({
-                        date: startDate,
-                        sleepDuration: (session.endTimeMillis - session.startTimeMillis) / (1000 * 60 * 60), // Convert to hours
+                        startTime: startTimeSeconds,
+                        endTime: endTimeSeconds,
+                        sleepDuration: duration,
                         sleepQuality: session.sleepQuality || undefined
                     });
 
@@ -356,12 +367,10 @@ export class GoogleFitService {
                             }
                         }
 
-                        const measurement = measurements.find(m => m.date === startDate);
-                        if (measurement) {
-                            measurement.deepSleep = deepSleep;
-                            measurement.lightSleep = lightSleep;
-                            measurement.remSleep = remSleep;
-                        }
+                        const measurement = measurements[measurements.length - 1];
+                        measurement.deepSleep = deepSleep;
+                        measurement.lightSleep = lightSleep;
+                        measurement.remSleep = remSleep;
                     }
                 }
             }
@@ -384,7 +393,7 @@ export class GoogleFitService {
         await this.refreshTokenIfNeeded();
 
         try {
-            const session = {
+            const session: GoogleFitSleepSession = {
                 activityType: 72, // Sleep
                 startTimeMillis: startTime * 1000,
                 endTimeMillis: endTime * 1000,
@@ -396,18 +405,18 @@ export class GoogleFitService {
             };
 
             if (sleepQuality !== undefined) {
-                session['sleepQuality'] = sleepQuality;
+                session.sleepQuality = sleepQuality;
             }
 
             if (segments) {
-                session['sleepSegments'] = segments.map(segment => ({
+                session.sleepSegments = segments.map(segment => ({
                     sleepStage: segment.type,
                     startTimeMillis: segment.startTime * 1000,
                     endTimeMillis: segment.endTime * 1000
                 }));
             }
 
-            const response = await requestUrl({
+            const response = await request({
                 url: 'https://www.googleapis.com/fitness/v1/users/me/sessions',
                 method: 'PUT',
                 headers: {
@@ -417,10 +426,8 @@ export class GoogleFitService {
                 body: JSON.stringify(session)
             });
 
-            console.log('Google Fit sleep session update response:', {
-                status: response.status,
-                data: response.json
-            });
+            const responseData = JSON.parse(response);
+            console.log('Google Fit sleep session update response:', responseData);
         } catch (error) {
             console.error('Failed to add Google Fit sleep session:', error);
             throw error;

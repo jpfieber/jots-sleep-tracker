@@ -8,6 +8,7 @@ export class MeasurementModal extends Modal {
         awakeTime?: string;
         addToJournal: boolean;
         addToSleepNote: boolean;
+        currentTime?: string;
     } = {
             addToJournal: true,
             addToSleepNote: false  // Default to false to match settings default
@@ -49,6 +50,12 @@ export class MeasurementModal extends Modal {
             .setClass('time-setting')
             .addText(text => {
                 text.inputEl.type = 'time';
+                const moment = (window as any).moment;
+                const now = moment().format('HH:mm');
+                text.setValue(now);
+                text.onChange((value) => {
+                    this.values.currentTime = value;
+                });
                 return text;
             });
 
@@ -61,13 +68,14 @@ export class MeasurementModal extends Modal {
                     .addOption('awake', 'Awake')
                     .setValue('asleep');
                 dropdown.onChange(value => {
-                    const time = dateTimeContainer.querySelector('input[type="time"]') as HTMLInputElement;
-                    if (value === 'asleep') {
-                        this.values.asleepTime = time.value;
-                        this.values.awakeTime = undefined;
-                    } else {
-                        this.values.awakeTime = time.value;
-                        this.values.asleepTime = undefined;
+                    if (this.values.currentTime) {
+                        if (value === 'asleep') {
+                            this.values.asleepTime = this.values.currentTime;
+                            this.values.awakeTime = undefined;
+                        } else {
+                            this.values.awakeTime = this.values.currentTime;
+                            this.values.asleepTime = undefined;
+                        }
                     }
                 });
             });
@@ -112,8 +120,12 @@ export class MeasurementModal extends Modal {
                 .setCta()
                 .onClick(() => {
                     const dateStr = (dateTimeContainer.querySelector('input[type="date"]') as HTMLInputElement).value;
-                    const timeStr = (dateTimeContainer.querySelector('input[type="time"]') as HTMLInputElement).value;
+                    const timeStr = this.values.currentTime;
                     const stateSelect = contentEl.querySelector('.dropdown') as HTMLSelectElement;
+
+                    if (!timeStr) {
+                        return;
+                    }
 
                     console.log('Modal submit - Date:', dateStr, 'Time:', timeStr, 'State:', stateSelect.value);
                     console.log('Current settings:', this.settings);
