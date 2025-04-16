@@ -95,18 +95,18 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
 
             // Add date range sync section
             containerEl.createEl('h4', { text: 'Sync Sleep Data' });
-            
+
             const syncDiv = containerEl.createDiv('sync-controls');
             syncDiv.style.padding = '10px';
             syncDiv.style.marginBottom = '20px';
-            
+
             // Date inputs in a single row
             const dateInputsDiv = syncDiv.createDiv();
             dateInputsDiv.style.display = 'flex';
             dateInputsDiv.style.gap = '20px';
             dateInputsDiv.style.alignItems = 'center';
             dateInputsDiv.style.marginBottom = '15px';
-            
+
             // Start date input
             const startDateDiv = dateInputsDiv.createDiv();
             startDateDiv.createEl('label', { text: 'Start Date: ' }).style.marginRight = '5px';
@@ -121,7 +121,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                 this.plugin.settings.lastSyncStartDate = startDateInput.value;
                 await this.plugin.saveSettings();
             });
-            
+
             // End date input
             const endDateDiv = dateInputsDiv.createDiv();
             endDateDiv.createEl('label', { text: 'End Date: ' }).style.marginRight = '5px';
@@ -143,7 +143,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
             destinationDiv.style.gap = '20px';
             destinationDiv.style.alignItems = 'center';
             destinationDiv.style.marginBottom = '15px';
-            
+
             // Journal entry checkbox
             const journalDiv = destinationDiv.createDiv();
             journalDiv.style.display = 'flex';
@@ -156,7 +156,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
             });
             journalCheck.checked = this.plugin.settings.lastSyncJournalEnabled;
             journalDiv.createEl('span', { text: 'Add to Journal' });
-            
+
             // Sleep note checkbox
             const sleepNoteDiv = destinationDiv.createDiv();
             sleepNoteDiv.style.display = 'flex';
@@ -185,7 +185,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
             const progressDiv = syncDiv.createDiv();
             progressDiv.style.marginBottom = '15px';
             progressDiv.style.display = 'none'; // Hide initially
-            
+
             const progressBarContainer = progressDiv.createDiv('progress-container');
             progressBarContainer.style.width = '100%';
             progressBarContainer.style.height = '4px';
@@ -193,33 +193,33 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
             progressBarContainer.style.borderRadius = '2px';
             progressBarContainer.style.overflow = 'hidden';
             progressBarContainer.style.marginBottom = '8px';
-            
+
             const progressBar = progressBarContainer.createDiv('progress-bar');
             progressBar.style.width = '0%';
             progressBar.style.height = '100%';
             progressBar.style.backgroundColor = 'var(--interactive-accent)';
             progressBar.style.transition = 'width 0.3s ease';
-            
+
             const progressStatusDiv = progressDiv.createDiv();
             progressStatusDiv.style.display = 'flex';
             progressStatusDiv.style.justifyContent = 'space-between';
             progressStatusDiv.style.alignItems = 'center';
             progressStatusDiv.style.marginTop = '8px';
-            
+
             const progressText = progressStatusDiv.createSpan();
             progressText.style.fontSize = '12px';
             progressText.style.color = 'var(--text-muted)';
-            
+
             const cancelButton = progressStatusDiv.createEl('button', {
                 text: 'Cancel',
                 cls: 'mod-warning'
             });
             cancelButton.style.padding = '4px 8px';
             cancelButton.style.fontSize = '12px';
-            
+
             // Single sync button
             const buttonDiv = syncDiv.createDiv();
-            
+
             const syncRangeButton = buttonDiv.createEl('button', {
                 text: 'Sync Date Range',
                 cls: 'mod-cta'
@@ -233,7 +233,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                     currentAbortController.abort();
                 }
                 currentAbortController = new AbortController();
-                
+
                 progressDiv.style.display = 'block';
                 cancelButton.style.display = 'inline-block';
                 syncRangeButton.disabled = true;
