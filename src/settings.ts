@@ -95,11 +95,11 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
 
             // Add date range sync section
             containerEl.createEl('h4', { text: 'Sync Sleep Data' });
-            
+
             const syncDiv = containerEl.createDiv('sync-controls');
             syncDiv.style.padding = '10px';
             syncDiv.style.marginBottom = '20px';
-            
+
             // Start date input
             const startDateDiv = syncDiv.createDiv();
             startDateDiv.createEl('label', { text: 'Start Date: ' });
@@ -109,7 +109,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                     required: 'required'
                 }
             });
-            
+
             // End date input
             const endDateDiv = syncDiv.createDiv();
             endDateDiv.style.marginTop = '10px';
@@ -126,7 +126,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
             progressDiv.style.marginTop = '15px';
             const progressText = progressDiv.createSpan();
             progressText.style.display = 'none';
-            
+
             // Sync buttons
             const buttonDiv = syncDiv.createDiv();
             buttonDiv.style.marginTop = '15px';
