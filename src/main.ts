@@ -132,11 +132,11 @@ export default class SleepTrackerPlugin extends Plugin {
 
             for (const measurement of sleepMeasurements) {
                 const moment = (window as any).moment;
-                
+
                 // Handle sleep (start) time
                 const sleepTimeStr = moment(measurement.startTime * 1000).format('HH:mm');
                 const sleepDateStr = moment(measurement.startTime * 1000).format('YYYY-MM-DD');
-                
+
                 const sleepRecord: MeasurementRecord = {
                     date: `${sleepDateStr} ${sleepTimeStr}`,
                     userId: this.settings.defaultUser || this.settings.users[0]?.id || '',
@@ -155,7 +155,7 @@ export default class SleepTrackerPlugin extends Plugin {
                 // Handle wake (end) time
                 const wakeTimeStr = moment(measurement.endTime * 1000).format('HH:mm');
                 const wakeDateStr = moment(measurement.endTime * 1000).format('YYYY-MM-DD');
-                
+
                 const wakeRecord: MeasurementRecord = {
                     date: `${wakeDateStr} ${wakeTimeStr}`,
                     userId: this.settings.defaultUser || this.settings.users[0]?.id || '',
