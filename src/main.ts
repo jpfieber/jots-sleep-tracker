@@ -119,24 +119,33 @@ export default class SleepTrackerPlugin extends Plugin {
         }
     }
 
-    async syncGoogleFit() {
+    async syncGoogleFit(startDate?: string, endDate?: string) {
         if (!this.googleFitService || !this.settings.googleAccessToken) {
             return;
         }
 
         try {
-            const now = Math.floor(new Date().getTime() / 1000);
-            const sevenDaysAgo = now - (7 * 24 * 60 * 60);
+            let startTime: number;
+            let endTime: number;
+            const moment = (window as any).moment;
 
-            const sleepMeasurements = await this.googleFitService.getSleepMeasurements(sevenDaysAgo, now);
+            if (startDate && endDate) {
+                // Use provided date range
+                startTime = moment(startDate).startOf('day').unix();
+                endTime = moment(endDate).endOf('day').unix();
+            } else {
+                // Default to last 7 days
+                endTime = Math.floor(new Date().getTime() / 1000);
+                startTime = endTime - (7 * 24 * 60 * 60);
+            }
+
+            const sleepMeasurements = await this.googleFitService.getSleepMeasurements(startTime, endTime);
 
             for (const measurement of sleepMeasurements) {
-                const moment = (window as any).moment;
-
                 // Handle sleep (start) time
                 const sleepTimeStr = moment(measurement.startTime * 1000).format('HH:mm');
                 const sleepDateStr = moment(measurement.startTime * 1000).format('YYYY-MM-DD');
-
+                
                 const sleepRecord: MeasurementRecord = {
                     date: `${sleepDateStr} ${sleepTimeStr}`,
                     userId: this.settings.defaultUser || this.settings.users[0]?.id || '',
@@ -155,7 +164,7 @@ export default class SleepTrackerPlugin extends Plugin {
                 // Handle wake (end) time
                 const wakeTimeStr = moment(measurement.endTime * 1000).format('HH:mm');
                 const wakeDateStr = moment(measurement.endTime * 1000).format('YYYY-MM-DD');
-
+                
                 const wakeRecord: MeasurementRecord = {
                     date: `${wakeDateStr} ${wakeTimeStr}`,
                     userId: this.settings.defaultUser || this.settings.users[0]?.id || '',
@@ -173,7 +182,10 @@ export default class SleepTrackerPlugin extends Plugin {
                 }
             }
 
-            new Notice(`Successfully synced sleep data from the last 7 days`);
+            const dateRangeStr = startDate && endDate 
+                ? `from ${startDate} to ${endDate}`
+                : 'from the last 7 days';
+            new Notice(`Successfully synced sleep data ${dateRangeStr}`);
         } catch (error) {
             console.error('Failed to sync with Google Fit:', error);
             new Notice('Failed to sync with Google Fit. Check the console for details.');

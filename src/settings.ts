@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting, setIcon, SearchComponent } from 'obsidian';
+import { App, PluginSettingTab, Setting, setIcon, SearchComponent, Notice } from 'obsidian';
 import { Settings, User, Measurement, MeasurementUnit, MeasurementType } from './types';
 import { FolderSuggest } from './foldersuggester';
 import { FileSuggest } from './filesuggester';
@@ -92,6 +92,100 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                         await this.plugin.saveSettings();
                         this.plugin.setupGoogleFitSync();
                     }));
+
+            // Add date range sync section
+            containerEl.createEl('h4', { text: 'Sync Sleep Data' });
+            
+            const syncDiv = containerEl.createDiv('sync-controls');
+            syncDiv.style.padding = '10px';
+            syncDiv.style.marginBottom = '20px';
+            
+            // Start date input
+            const startDateDiv = syncDiv.createDiv();
+            startDateDiv.createEl('label', { text: 'Start Date: ' });
+            const startDateInput = startDateDiv.createEl('input', {
+                attr: {
+                    type: 'date',
+                    required: 'required'
+                }
+            });
+            
+            // End date input
+            const endDateDiv = syncDiv.createDiv();
+            endDateDiv.style.marginTop = '10px';
+            endDateDiv.createEl('label', { text: 'End Date: ' });
+            const endDateInput = endDateDiv.createEl('input', {
+                attr: {
+                    type: 'date',
+                    required: 'required'
+                }
+            });
+
+            // Progress container
+            const progressDiv = syncDiv.createDiv();
+            progressDiv.style.marginTop = '15px';
+            const progressText = progressDiv.createSpan();
+            progressText.style.display = 'none';
+            
+            // Sync buttons
+            const buttonDiv = syncDiv.createDiv();
+            buttonDiv.style.marginTop = '15px';
+            buttonDiv.style.display = 'flex';
+            buttonDiv.style.gap = '10px';
+
+            const syncRangeButton = buttonDiv.createEl('button', {
+                text: 'Sync Date Range'
+            });
+            syncRangeButton.disabled = !this.plugin.settings.googleAccessToken;
+
+            const syncWeekButton = buttonDiv.createEl('button', {
+                text: 'Sync Last 7 Days'
+            });
+            syncWeekButton.disabled = !this.plugin.settings.googleAccessToken;
+
+            const startSync = async (startDate?: string, endDate?: string) => {
+                progressText.style.display = 'block';
+                progressText.setText('Syncing sleep data...');
+                syncRangeButton.disabled = true;
+                syncWeekButton.disabled = true;
+
+                try {
+                    await this.plugin.syncGoogleFit(startDate, endDate);
+                    progressText.setText('Sync completed successfully!');
+                    setTimeout(() => {
+                        progressText.style.display = 'none';
+                    }, 3000);
+                } catch (error) {
+                    progressText.setText('Sync failed. Check console for details.');
+                    setTimeout(() => {
+                        progressText.style.display = 'none';
+                    }, 3000);
+                } finally {
+                    syncRangeButton.disabled = !this.plugin.settings.googleAccessToken;
+                    syncWeekButton.disabled = !this.plugin.settings.googleAccessToken;
+                }
+            };
+
+            syncRangeButton.onclick = async () => {
+                const startDate = startDateInput.value;
+                const endDate = endDateInput.value;
+
+                if (!startDate || !endDate) {
+                    new Notice('Please enter both start and end dates');
+                    return;
+                }
+
+                if (startDate > endDate) {
+                    new Notice('Start date must be before or equal to end date');
+                    return;
+                }
+
+                await startSync(startDate, endDate);
+            };
+
+            syncWeekButton.onclick = async () => {
+                await startSync();
+            };
         }
 
         // Journal Entry Settings
