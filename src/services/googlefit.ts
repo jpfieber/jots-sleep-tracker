@@ -324,7 +324,7 @@ export class GoogleFitService {
             });
 
             const measurements: GoogleFitSleepMeasurement[] = [];
-            
+
             if (sleepResponse.json.session) {
                 for (const session of sleepResponse.json.session) {
                     // Convert milliseconds to seconds for the date

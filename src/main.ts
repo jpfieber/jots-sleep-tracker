@@ -31,7 +31,7 @@ export default class SleepTrackerPlugin extends Plugin {
         // Add command for manual sleep entry
         this.addCommand({
             id: 'add-sleep',
-            name: 'Add Sleep Record',
+            name: 'Add Sleep Record Manually',
             callback: () => {
                 new MeasurementModal(this.app, this).open();
             }
@@ -148,7 +148,7 @@ export default class SleepTrackerPlugin extends Plugin {
                 if (this.settings.enableMeasurementFiles) {
                     await this.measurementService.updateMeasurementFiles(record);
                 }
-                
+
                 if (this.settings.enableJournalEntry) {
                     const journalService = new JournalService(this.app, this.settings);
                     await journalService.appendToJournal(record);
@@ -199,7 +199,7 @@ export default class SleepTrackerPlugin extends Plugin {
 
         this.addCommand({
             id: 'sync-google-fit',
-            name: 'Sync Google Fit Measurements',
+            name: 'Add Sleep Records via Google Fit',
             checkCallback: (checking: boolean): boolean => {
                 const canRun: boolean = !!(
                     this.settings.enableGoogleFit
@@ -245,8 +245,9 @@ export default class SleepTrackerPlugin extends Plugin {
                 buttonDiv.style.marginTop = '1em';
 
                 const submitButton = buttonDiv.createEl('button', {
-                    text: 'Complete Authentication'
+                    text: 'Submit'
                 });
+
                 submitButton.onclick = async () => {
                     const code = codeInput.value;
                     const state = stateInput.value;

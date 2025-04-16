@@ -29,13 +29,18 @@
     },
     {
       "id": "sync-google-fit",
-      "name": "Sync Google Fit Measurements",
+      "name": "Add Sleep Records via Google Fit",
       "icon": "refresh-cw"
     },
     {
       "id": "complete-google-fit-auth",
       "name": "Complete Google Fit Authentication",
       "icon": "check"
+    },
+    {
+      "id": "add-sleep",
+      "name": "Add Sleep Record Manually",
+      "icon": "plus"
     }
   ]
 }
