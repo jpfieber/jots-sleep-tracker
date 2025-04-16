@@ -61,6 +61,12 @@ export interface Settings {
     trackSleepQuality: boolean;
     trackSleepStages: boolean;
 
+    // Sync settings
+    lastSyncJournalEnabled: boolean;
+    lastSyncSleepNoteEnabled: boolean;
+    lastSyncStartDate?: string;
+    lastSyncEndDate?: string;
+
     // Google Fit integration settings
     enableGoogleFit: boolean;
     googleClientId: string;
@@ -120,6 +126,10 @@ export const DEFAULT_SETTINGS: Settings = {
     trackTotalSleep: true,
     trackSleepQuality: true,
     trackSleepStages: true,
+
+    // Sync settings
+    lastSyncJournalEnabled: false,
+    lastSyncSleepNoteEnabled: false,
 
     // Google Fit defaults
     enableGoogleFit: false,

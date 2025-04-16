@@ -119,9 +119,19 @@ export default class SleepTrackerPlugin extends Plugin {
         }
     }
 
-    async syncGoogleFit(startDate?: string, endDate?: string) {
+    async syncGoogleFit(startDate?: string, endDate?: string, progressCallback?: (current: number, total: number) => void, tempSettings?: { enableJournalEntry?: boolean, enableSleepNote?: boolean }) {
         if (!this.googleFitService || !this.settings.googleAccessToken) {
             return;
+        }
+
+        // Store original settings
+        const originalJournalSetting = this.settings.enableJournalEntry;
+        const originalSleepNoteSetting = this.settings.enableSleepNote;
+
+        // Apply temporary settings if provided
+        if (tempSettings !== undefined) {
+            this.settings.enableJournalEntry = tempSettings.enableJournalEntry ?? this.settings.enableJournalEntry;
+            this.settings.enableSleepNote = tempSettings.enableSleepNote ?? this.settings.enableSleepNote;
         }
 
         try {
@@ -139,32 +149,36 @@ export default class SleepTrackerPlugin extends Plugin {
                 startTime = endTime - (7 * 24 * 60 * 60);
             }
 
+            // Calculate total days for progress tracking
+            const totalDays = Math.ceil((endTime - startTime) / (24 * 60 * 60));
+            let processedDays = new Set();
+
             const sleepMeasurements = await this.googleFitService.getSleepMeasurements(startTime, endTime);
 
             for (const measurement of sleepMeasurements) {
                 // Handle sleep (start) time
                 const sleepTimeStr = moment(measurement.startTime * 1000).format('HH:mm');
                 const sleepDateStr = moment(measurement.startTime * 1000).format('YYYY-MM-DD');
-
+                
                 const sleepRecord: MeasurementRecord = {
                     date: `${sleepDateStr} ${sleepTimeStr}`,
                     userId: this.settings.defaultUser || this.settings.users[0]?.id || '',
                     asleepTime: sleepTimeStr
                 };
 
-                // Add sleep record to appropriate date's journal
-                if (this.settings.enableMeasurementFiles) {
-                    await this.measurementService.updateMeasurementFiles(sleepRecord);
+                // Track processed day and update progress
+                processedDays.add(sleepDateStr);
+                if (progressCallback) {
+                    progressCallback(processedDays.size, totalDays);
                 }
-                if (this.settings.enableJournalEntry) {
-                    const journalService = new JournalService(this.app, this.settings);
-                    await journalService.appendToJournal(sleepRecord);
-                }
+
+                // Add sleep record to appropriate locations
+                await this.saveMeasurement(sleepRecord);
 
                 // Handle wake (end) time
                 const wakeTimeStr = moment(measurement.endTime * 1000).format('HH:mm');
                 const wakeDateStr = moment(measurement.endTime * 1000).format('YYYY-MM-DD');
-
+                
                 const wakeRecord: MeasurementRecord = {
                     date: `${wakeDateStr} ${wakeTimeStr}`,
                     userId: this.settings.defaultUser || this.settings.users[0]?.id || '',
@@ -172,23 +186,30 @@ export default class SleepTrackerPlugin extends Plugin {
                     sleepDuration: measurement.sleepDuration?.toFixed(1)
                 };
 
-                // Add wake record to appropriate date's journal
-                if (this.settings.enableMeasurementFiles) {
-                    await this.measurementService.updateMeasurementFiles(wakeRecord);
+                // Track processed day and update progress
+                processedDays.add(wakeDateStr);
+                if (progressCallback) {
+                    progressCallback(processedDays.size, totalDays);
                 }
-                if (this.settings.enableJournalEntry) {
-                    const journalService = new JournalService(this.app, this.settings);
-                    await journalService.appendToJournal(wakeRecord);
-                }
+
+                // Add wake record to appropriate locations
+                await this.saveMeasurement(wakeRecord);
             }
 
-            const dateRangeStr = startDate && endDate
+            const dateRangeStr = startDate && endDate 
                 ? `from ${startDate} to ${endDate}`
                 : 'from the last 7 days';
             new Notice(`Successfully synced sleep data ${dateRangeStr}`);
         } catch (error) {
             console.error('Failed to sync with Google Fit:', error);
-            new Notice('Failed to sync with Google Fit. Check the console for details.');
+            if (error.message !== 'Sync cancelled') {
+                new Notice('Failed to sync with Google Fit. Check the console for details.');
+            }
+            throw error;
+        } finally {
+            // Restore original settings
+            this.settings.enableJournalEntry = originalJournalSetting;
+            this.settings.enableSleepNote = originalSleepNoteSetting;
         }
     }
 
@@ -202,6 +223,12 @@ export default class SleepTrackerPlugin extends Plugin {
         if (this.settings.enableJournalEntry) {
             const journalService = new JournalService(this.app, this.settings);
             await journalService.appendToJournal(data);
+        }
+
+        // Add to sleep note
+        if (this.settings.enableSleepNote) {
+            const journalService = new JournalService(this.app, this.settings);
+            await journalService.appendToSleepNote(data);
         }
     }
 

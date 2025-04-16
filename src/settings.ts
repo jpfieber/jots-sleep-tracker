@@ -95,74 +95,193 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
 
             // Add date range sync section
             containerEl.createEl('h4', { text: 'Sync Sleep Data' });
-
+            
             const syncDiv = containerEl.createDiv('sync-controls');
             syncDiv.style.padding = '10px';
             syncDiv.style.marginBottom = '20px';
-
+            
+            // Date inputs in a single row
+            const dateInputsDiv = syncDiv.createDiv();
+            dateInputsDiv.style.display = 'flex';
+            dateInputsDiv.style.gap = '20px';
+            dateInputsDiv.style.alignItems = 'center';
+            dateInputsDiv.style.marginBottom = '15px';
+            
             // Start date input
-            const startDateDiv = syncDiv.createDiv();
-            startDateDiv.createEl('label', { text: 'Start Date: ' });
+            const startDateDiv = dateInputsDiv.createDiv();
+            startDateDiv.createEl('label', { text: 'Start Date: ' }).style.marginRight = '5px';
             const startDateInput = startDateDiv.createEl('input', {
                 attr: {
                     type: 'date',
-                    required: 'required'
+                    required: 'required',
+                    value: this.plugin.settings.lastSyncStartDate || ''
                 }
             });
-
+            startDateInput.addEventListener('change', async () => {
+                this.plugin.settings.lastSyncStartDate = startDateInput.value;
+                await this.plugin.saveSettings();
+            });
+            
             // End date input
-            const endDateDiv = syncDiv.createDiv();
-            endDateDiv.style.marginTop = '10px';
-            endDateDiv.createEl('label', { text: 'End Date: ' });
+            const endDateDiv = dateInputsDiv.createDiv();
+            endDateDiv.createEl('label', { text: 'End Date: ' }).style.marginRight = '5px';
             const endDateInput = endDateDiv.createEl('input', {
                 attr: {
                     type: 'date',
-                    required: 'required'
+                    required: 'required',
+                    value: this.plugin.settings.lastSyncEndDate || ''
                 }
             });
+            endDateInput.addEventListener('change', async () => {
+                this.plugin.settings.lastSyncEndDate = endDateInput.value;
+                await this.plugin.saveSettings();
+            });
 
-            // Progress container
+            // Add sync destination options
+            const destinationDiv = syncDiv.createDiv();
+            destinationDiv.style.display = 'flex';
+            destinationDiv.style.gap = '20px';
+            destinationDiv.style.alignItems = 'center';
+            destinationDiv.style.marginBottom = '15px';
+            
+            // Journal entry checkbox
+            const journalDiv = destinationDiv.createDiv();
+            journalDiv.style.display = 'flex';
+            journalDiv.style.alignItems = 'center';
+            journalDiv.style.gap = '5px';
+            const journalCheck = journalDiv.createEl('input', {
+                attr: {
+                    type: 'checkbox'
+                }
+            });
+            journalCheck.checked = this.plugin.settings.lastSyncJournalEnabled;
+            journalDiv.createEl('span', { text: 'Add to Journal' });
+            
+            // Sleep note checkbox
+            const sleepNoteDiv = destinationDiv.createDiv();
+            sleepNoteDiv.style.display = 'flex';
+            sleepNoteDiv.style.alignItems = 'center';
+            sleepNoteDiv.style.gap = '5px';
+            const sleepNoteCheck = sleepNoteDiv.createEl('input', {
+                attr: {
+                    type: 'checkbox'
+                }
+            });
+            sleepNoteCheck.checked = this.plugin.settings.lastSyncSleepNoteEnabled;
+            sleepNoteDiv.createEl('span', { text: 'Add to Sleep Note' });
+
+            // Save checkbox states when changed
+            journalCheck.addEventListener('change', async () => {
+                this.plugin.settings.lastSyncJournalEnabled = journalCheck.checked;
+                await this.plugin.saveSettings();
+            });
+
+            sleepNoteCheck.addEventListener('change', async () => {
+                this.plugin.settings.lastSyncSleepNoteEnabled = sleepNoteCheck.checked;
+                await this.plugin.saveSettings();
+            });
+
+            // Progress container with progress bar and cancel button
             const progressDiv = syncDiv.createDiv();
-            progressDiv.style.marginTop = '15px';
-            const progressText = progressDiv.createSpan();
-            progressText.style.display = 'none';
-
-            // Sync buttons
+            progressDiv.style.marginBottom = '15px';
+            progressDiv.style.display = 'none'; // Hide initially
+            
+            const progressBarContainer = progressDiv.createDiv('progress-container');
+            progressBarContainer.style.width = '100%';
+            progressBarContainer.style.height = '4px';
+            progressBarContainer.style.backgroundColor = 'var(--background-modifier-border)';
+            progressBarContainer.style.borderRadius = '2px';
+            progressBarContainer.style.overflow = 'hidden';
+            progressBarContainer.style.marginBottom = '8px';
+            
+            const progressBar = progressBarContainer.createDiv('progress-bar');
+            progressBar.style.width = '0%';
+            progressBar.style.height = '100%';
+            progressBar.style.backgroundColor = 'var(--interactive-accent)';
+            progressBar.style.transition = 'width 0.3s ease';
+            
+            const progressStatusDiv = progressDiv.createDiv();
+            progressStatusDiv.style.display = 'flex';
+            progressStatusDiv.style.justifyContent = 'space-between';
+            progressStatusDiv.style.alignItems = 'center';
+            progressStatusDiv.style.marginTop = '8px';
+            
+            const progressText = progressStatusDiv.createSpan();
+            progressText.style.fontSize = '12px';
+            progressText.style.color = 'var(--text-muted)';
+            
+            const cancelButton = progressStatusDiv.createEl('button', {
+                text: 'Cancel',
+                cls: 'mod-warning'
+            });
+            cancelButton.style.padding = '4px 8px';
+            cancelButton.style.fontSize = '12px';
+            
+            // Single sync button
             const buttonDiv = syncDiv.createDiv();
-            buttonDiv.style.marginTop = '15px';
-            buttonDiv.style.display = 'flex';
-            buttonDiv.style.gap = '10px';
-
+            
             const syncRangeButton = buttonDiv.createEl('button', {
-                text: 'Sync Date Range'
+                text: 'Sync Date Range',
+                cls: 'mod-cta'
             });
             syncRangeButton.disabled = !this.plugin.settings.googleAccessToken;
 
-            const syncWeekButton = buttonDiv.createEl('button', {
-                text: 'Sync Last 7 Days'
-            });
-            syncWeekButton.disabled = !this.plugin.settings.googleAccessToken;
+            let currentAbortController: AbortController | null = null;
 
             const startSync = async (startDate?: string, endDate?: string) => {
-                progressText.style.display = 'block';
-                progressText.setText('Syncing sleep data...');
+                if (currentAbortController) {
+                    currentAbortController.abort();
+                }
+                currentAbortController = new AbortController();
+                
+                progressDiv.style.display = 'block';
+                cancelButton.style.display = 'inline-block';
                 syncRangeButton.disabled = true;
-                syncWeekButton.disabled = true;
+                syncRangeButton.style.opacity = '0.5';
+
+                const tempSettings = {
+                    enableJournalEntry: journalCheck.checked,
+                    enableSleepNote: sleepNoteCheck.checked
+                };
 
                 try {
-                    await this.plugin.syncGoogleFit(startDate, endDate);
+                    await this.plugin.syncGoogleFit(startDate, endDate, (current, total) => {
+                        if (currentAbortController?.signal.aborted) {
+                            throw new Error('Sync cancelled');
+                        }
+                        const percent = (current / total) * 100;
+                        progressBar.style.width = `${percent}%`;
+                        progressText.setText(`Syncing sleep data... ${current}/${total} days`);
+                    }, tempSettings);
+                    progressBar.style.width = '100%';
                     progressText.setText('Sync completed successfully!');
                     setTimeout(() => {
-                        progressText.style.display = 'none';
+                        progressDiv.style.display = 'none';
+                        progressBar.style.width = '0%';
+                        cancelButton.style.display = 'none';
                     }, 3000);
                 } catch (error) {
-                    progressText.setText('Sync failed. Check console for details.');
+                    if (error.message === 'Sync cancelled') {
+                        progressText.setText('Sync cancelled');
+                    } else {
+                        progressText.setText('Sync failed. Check console for details.');
+                        console.error('Sync error:', error);
+                    }
                     setTimeout(() => {
-                        progressText.style.display = 'none';
+                        progressDiv.style.display = 'none';
+                        progressBar.style.width = '0%';
+                        cancelButton.style.display = 'none';
                     }, 3000);
                 } finally {
+                    currentAbortController = null;
                     syncRangeButton.disabled = !this.plugin.settings.googleAccessToken;
-                    syncWeekButton.disabled = !this.plugin.settings.googleAccessToken;
+                    syncRangeButton.style.opacity = '1';
+                }
+            };
+
+            cancelButton.onclick = () => {
+                if (currentAbortController) {
+                    currentAbortController.abort();
                 }
             };
 
@@ -181,10 +300,6 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                 }
 
                 await startSync(startDate, endDate);
-            };
-
-            syncWeekButton.onclick = async () => {
-                await startSync();
             };
         }
 
