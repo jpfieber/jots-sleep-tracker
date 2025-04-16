@@ -210,5 +210,46 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                     }));
         }
 
+        // Sleep Note Settings
+        containerEl.createEl('h3', { text: 'Sleep Note' });
+
+        new Setting(containerEl)
+            .setName('Enable Sleep Note')
+            .setDesc('Add sleep entries to a dedicated sleep tracking note')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.enableSleepNote)
+                .onChange(async (value) => {
+                    this.plugin.settings.enableSleepNote = value;
+                    await this.plugin.saveSettings();
+                    this.display();
+                }));
+
+        if (this.plugin.settings.enableSleepNote) {
+            new Setting(containerEl)
+                .setName('Sleep Note Location')
+                .setDesc('Path to your dedicated sleep tracking note')
+                .setClass('settings-indent')
+                .addSearch((cb) => {
+                    new FileSuggest(this.app, cb.inputEl);
+                    cb.setPlaceholder("Sleep/sleep-tracking.md")
+                        .setValue(this.plugin.settings.sleepNotePath)
+                        .onChange((new_path) => {
+                            this.plugin.settings.sleepNotePath = new_path;
+                            this.plugin.saveSettings();
+                        });
+                });
+
+            new Setting(containerEl)
+                .setName('Sleep Note Entry Template')
+                .setDesc('Template for sleep entries. Use <date>, <time>, <type>, and <duration> as placeholders')
+                .setClass('settings-indent')
+                .addText(text => text
+                    .setPlaceholder('| <date> | <time> | <type> | <duration> |')
+                    .setValue(this.plugin.settings.sleepNoteTemplate)
+                    .onChange(async (value) => {
+                        this.plugin.settings.sleepNoteTemplate = value;
+                        await this.plugin.saveSettings();
+                    }));
+        }
     }
 }

@@ -36,6 +36,11 @@ export interface Settings {
     taskSvgIcon: string;
     dailyNoteTemplate?: string;
 
+    // Sleep Note settings
+    enableSleepNote: boolean;
+    sleepNotePath: string;
+    sleepNoteTemplate: string;
+
     // Measurement file settings
     enableMeasurementFiles: boolean;
     measurementFolder: string;
@@ -77,6 +82,11 @@ export const DEFAULT_SETTINGS: Settings = {
     stringPrefixLetter: 's',
     decoratedTaskSymbol: '💤',
     taskSvgIcon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxZW0iIGhlaWdodD0iMWVtIiB2aWV3Qm94PSIwIDAgMjQgMjQiPjxwYXRoIGZpbGw9ImN1cnJlbnRDb2xvciIgZD0iTTEyLjUgM2MtNS4yNSAwLTkuNSA0LjI1LTkuNSA5LjVzNC4yNSA5LjUgOS41IDkuNWM1LjI1IDAgOS41LTQuMjUgOS41LTkuNVMxNy43NSAzIDEyLjUgM20wIDJjNC4xNSAwIDcuNSAzLjM1IDcuNSA3LjVzLTMuMzUgNy41LTcuNSA3LjVTNSAxNi42NSA1IDEyLjVTOC4zNSA1IDEyLjUgNW0tMy41IDJsMS43IDEuN2gtMi45bDEuMi0xLjdtOCAwbDEuMiAxLjdoLTIuOWwxLjctMS43TTkgMTVsLTEuNy0xLjdoMi45TDkgMTVtOCAwbC0xLjItMS43aDIuOUwxNyAxNSIvPjwvc3ZnPg==',
+
+    // Sleep Note settings
+    enableSleepNote: false,
+    sleepNotePath: 'Sleep/sleep-tracking.md',
+    sleepNoteTemplate: '| <date> | <time> | <type> | <duration> |',
 
     enableMeasurementFiles: true,
     measurementFolder: 'Sleep',

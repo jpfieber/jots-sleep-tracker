@@ -10,12 +10,15 @@ export class MeasurementModal extends Modal {
         addToSleepNote: boolean;
     } = {
             addToJournal: true,
-            addToSleepNote: true
+            addToSleepNote: false  // Default to false to match settings default
         };
 
     constructor(app: App, private plugin: any) {
         super(app);
         this.settings = plugin.settings;
+        // Initialize values based on current settings
+        this.values.addToJournal = this.settings.enableJournalEntry;
+        this.values.addToSleepNote = this.settings.enableSleepNote;
     }
 
     onOpen() {
@@ -69,27 +72,38 @@ export class MeasurementModal extends Modal {
                 });
             });
 
-        // Checkbox for adding to journal
-        new Setting(contentEl)
-            .setName('Add to Journal')
-            .addToggle(toggle => {
-                toggle
-                    .setValue(this.values.addToJournal)
-                    .onChange(value => {
-                        this.values.addToJournal = value;
-                    });
-            });
+        // Only show these options if they are configured in settings
+        if (this.settings.enableJournalEntry || this.settings.enableSleepNote) {
+            contentEl.createEl('h3', { text: 'Save Options' });
+        }
 
-        // Checkbox for adding to sleep note
-        new Setting(contentEl)
-            .setName('Add to Sleep Note')
-            .addToggle(toggle => {
-                toggle
-                    .setValue(this.values.addToSleepNote)
-                    .onChange(value => {
-                        this.values.addToSleepNote = value;
-                    });
-            });
+        // Checkbox for adding to journal - only show if journal entries are enabled in settings
+        if (this.settings.enableJournalEntry) {
+            new Setting(contentEl)
+                .setName('Add to Journal')
+                .setDesc('Add this sleep record to your daily journal')
+                .addToggle(toggle => {
+                    toggle
+                        .setValue(this.values.addToJournal)
+                        .onChange(value => {
+                            this.values.addToJournal = value;
+                        });
+                });
+        }
+
+        // Checkbox for adding to sleep note - only show if sleep note is enabled and configured in settings
+        if (this.settings.enableSleepNote && this.settings.sleepNotePath) {
+            new Setting(contentEl)
+                .setName('Add to Sleep Note')
+                .setDesc('Add this sleep record to your sleep tracking note')
+                .addToggle(toggle => {
+                    toggle
+                        .setValue(this.values.addToSleepNote)
+                        .onChange(value => {
+                            this.values.addToSleepNote = value;
+                        });
+                });
+        }
 
         // Submit button
         new Setting(contentEl)
@@ -118,19 +132,25 @@ export class MeasurementModal extends Modal {
                             const asleepMoment = (window as any).moment(`${dateStr} ${this.values.asleepTime}`, 'YYYY-MM-DD HH:mm');
                             const awakeMoment = (window as any).moment(`${dateStr} ${timeStr}`, 'YYYY-MM-DD HH:mm');
                             const duration = awakeMoment.diff(asleepMoment, 'hours', true);
-                            measurementData.sleepDuration = duration.toFixed(2);
+                            measurementData.sleepDuration = duration.toFixed(1);
                         }
                     }
 
                     console.log('Sending measurement data:', measurementData);
-                    console.log('Journal enabled:', this.settings.enableJournalEntry);
-                    console.log('Measurement files enabled:', this.settings.enableMeasurementFiles);
 
-                    // Enable/disable journal and measurement file updates based on checkboxes
-                    this.settings.enableJournalEntry = this.values.addToJournal;
-                    this.settings.enableMeasurementFiles = this.values.addToSleepNote;
+                    // Temporarily override settings based on user's choices
+                    const originalJournalSetting = this.settings.enableJournalEntry;
+                    const originalSleepNoteSetting = this.settings.enableSleepNote;
+
+                    this.settings.enableJournalEntry = this.settings.enableJournalEntry && this.values.addToJournal;
+                    this.settings.enableSleepNote = this.settings.enableSleepNote && this.values.addToSleepNote;
 
                     this.plugin.saveMeasurement(measurementData);
+
+                    // Restore original settings
+                    this.settings.enableJournalEntry = originalJournalSetting;
+                    this.settings.enableSleepNote = originalSleepNoteSetting;
+
                     this.close();
                 }));
     }

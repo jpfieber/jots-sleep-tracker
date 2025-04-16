@@ -7,7 +7,7 @@ import { getJournalPath } from './path-service';
 export class JournalService {
     private fileCreationInProgress: { [key: string]: Promise<TFile> } = {};
 
-    constructor(private app: App, private settings: any) {}
+    constructor(private app: App, private settings: any) { }
 
     private formatTime(timeStr: string): string {
         return timeStr;
@@ -265,61 +265,161 @@ export class JournalService {
         return duration < 0 ? 0 : Math.round(duration * 10) / 10; // Round to 1 decimal place
     }
 
-    async appendToJournal(data: MeasurementRecord) {
+    private async appendToSleepNote(data: MeasurementRecord): Promise<void> {
         try {
-            const prefix = `- [${this.settings.stringPrefixLetter}] `;
-            console.log('JournalService: Starting appendToJournal with data:', data);
-            console.log('JournalService: Using prefix:', prefix);
-            console.log('JournalService: Current settings:', this.settings);
+            if (!this.settings.sleepNotePath) {
+                throw new Error('Sleep note path not configured');
+            }
+
+            let file = this.app.vault.getAbstractFileByPath(this.settings.sleepNotePath);
+
+            // Create the file if it doesn't exist
+            if (!(file instanceof TFile)) {
+                const folder = this.settings.sleepNotePath.substring(0, this.settings.sleepNotePath.lastIndexOf('/'));
+                if (folder) {
+                    await this.ensureFolderExists(folder);
+                }
+                file = await this.app.vault.create(this.settings.sleepNotePath, '# Sleep Tracking\n\n| Date | Time | Type | Duration |\n|------|------|------|----------|\n');
+
+                // Wait for file to be ready
+                const verifiedFile = await this.waitForFile(this.settings.sleepNotePath);
+                if (!verifiedFile) {
+                    throw new Error('Failed to verify sleep note file after creation');
+                }
+                file = verifiedFile;
+            }
+
+            // Read existing content with retry
+            let content = '';
+            for (let attempt = 0; attempt < 3; attempt++) {
+                try {
+                    if (file instanceof TFile) {
+                        content = await this.app.vault.read(file);
+                        if (content.includes('{{')) {
+                            // File still has template markers, wait and retry
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                            continue;
+                        }
+                        break;
+                    }
+                } catch (error) {
+                    console.log('Sleep note read attempt', attempt + 1, 'failed:', error);
+                    if (attempt === 2) throw error;
+                    await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)));
+                }
+            }
+
+            if (!content) {
+                throw new Error('Could not read sleep note content');
+            }
+
+            const [date, time] = data.date.split(' ');
+            let modifiedContent = false;
 
             if (data.asleepTime) {
-                const [date, time] = data.date.split(' ');
-                console.log('JournalService: Adding asleep entry for date:', date, 'time:', time);
-                const asleepEntry = prefix + this.settings.asleepEntryTemplate
-                    .replace('<time>', time) + '\n';
-                console.log('JournalService: Generated asleep entry:', asleepEntry);
-                await this.appendEntry(date, asleepEntry);
+                const entry = this.settings.sleepNoteTemplate
+                    .replace('<date>', date)
+                    .replace('<time>', time)
+                    .replace('<type>', '💤 Asleep')
+                    .replace('<duration>', '') + '\n';
+
+                if (!content.includes(entry.trim())) {
+                    content = content.trim() + '\n' + entry;
+                    modifiedContent = true;
+                }
             }
 
             if (data.awakeTime) {
-                const [date, time] = data.date.split(' ');
                 let duration = '0.0';
-
                 if (!data.sleepDuration) {
                     const previousSleepTime = await this.findMostRecentSleepTime(date);
-                    console.log('[Sleep Tracker Debug] Previous sleep time found:', previousSleepTime);
-
                     if (previousSleepTime) {
-                        const moment = (window as any).moment;
-                        const awakeMoment = moment(`${date} ${time}`, 'YYYY-MM-DD HH:mm');
-                        console.log('[Sleep Tracker Debug] Awake moment:', awakeMoment.format('YYYY-MM-DD HH:mm'));
-
-                        const previousDate = moment(date).subtract(1, 'day').format('YYYY-MM-DD');
-                        const sleepMoment = moment(`${previousDate} ${previousSleepTime}`, 'YYYY-MM-DD HH:mm');
-                        console.log('[Sleep Tracker Debug] Sleep moment:', sleepMoment.format('YYYY-MM-DD HH:mm'));
-
                         const durationHours = this.calculateSleepDuration(previousSleepTime, time, date);
                         duration = durationHours.toFixed(1);
-                        console.log('[Sleep Tracker Debug] Calculated duration:', duration);
-                    } else {
-                        console.log('[Sleep Tracker Debug] No previous sleep time found, using default duration');
-                        duration = '0.0';
                     }
                 } else {
-                    duration = data.sleepDuration.toString();
-                    console.log('[Sleep Tracker Debug] Using provided sleep duration:', duration);
+                    duration = data.sleepDuration;
                 }
 
-                console.log('JournalService: Adding awake entry for date:', date, 'time:', time);
-                const awakeEntry = prefix + this.settings.awakeEntryTemplate
+                const entry = this.settings.sleepNoteTemplate
+                    .replace('<date>', date)
                     .replace('<time>', time)
+                    .replace('<type>', '⏰ Awake')
                     .replace('<duration>', duration) + '\n';
-                console.log('JournalService: Generated awake entry:', awakeEntry);
-                await this.appendEntry(date, awakeEntry);
+
+                if (!content.includes(entry.trim())) {
+                    content = content.trim() + '\n' + entry;
+                    modifiedContent = true;
+                }
+            }
+
+            // Only modify the file if we actually added new content
+            if (modifiedContent && file instanceof TFile) {
+                for (let attempt = 0; attempt < 3; attempt++) {
+                    try {
+                        await this.app.vault.modify(file, content);
+                        console.log('Successfully updated sleep note');
+                        break;
+                    } catch (error) {
+                        console.log('Sleep note update attempt', attempt + 1, 'failed:', error);
+                        if (attempt === 2) throw error;
+                        await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)));
+                    }
+                }
             }
         } catch (error) {
-            console.error('Failed to update journal:', error);
-            new Notice('Failed to update journal. Please try again.');
+            console.error('Failed to update sleep note:', error);
+            new Notice('Failed to update sleep note. Please try again.');
+            throw error;
+        }
+    }
+
+    async appendToJournal(data: MeasurementRecord) {
+        try {
+            if (this.settings.enableJournalEntry) {
+                const prefix = `- [${this.settings.stringPrefixLetter}] `;
+                console.log('JournalService: Starting appendToJournal with data:', data);
+                console.log('JournalService: Using prefix:', prefix);
+                console.log('JournalService: Current settings:', this.settings);
+
+                if (data.asleepTime) {
+                    const [date, time] = data.date.split(' ');
+                    console.log('JournalService: Adding asleep entry for date:', date, 'time:', time);
+                    const asleepEntry = prefix + this.settings.asleepEntryTemplate
+                        .replace('<time>', time) + '\n';
+                    console.log('JournalService: Generated asleep entry:', asleepEntry);
+                    await this.appendEntry(date, asleepEntry);
+                }
+
+                if (data.awakeTime) {
+                    const [date, time] = data.date.split(' ');
+                    let duration = '0.0';
+
+                    if (!data.sleepDuration) {
+                        const previousSleepTime = await this.findMostRecentSleepTime(date);
+                        if (previousSleepTime) {
+                            const durationHours = this.calculateSleepDuration(previousSleepTime, time, date);
+                            duration = durationHours.toFixed(1);
+                        }
+                    } else {
+                        duration = data.sleepDuration.toString();
+                    }
+
+                    console.log('JournalService: Adding awake entry for date:', date, 'time:', time);
+                    const awakeEntry = prefix + this.settings.awakeEntryTemplate
+                        .replace('<time>', time)
+                        .replace('<duration>', duration) + '\n';
+                    console.log('JournalService: Generated awake entry:', awakeEntry);
+                    await this.appendEntry(date, awakeEntry);
+                }
+            }
+
+            if (this.settings.enableSleepNote) {
+                await this.appendToSleepNote(data);
+            }
+        } catch (error) {
+            console.error('Failed to update entries:', error);
+            new Notice('Failed to update entries. Please try again.');
             throw error;
         }
     }
