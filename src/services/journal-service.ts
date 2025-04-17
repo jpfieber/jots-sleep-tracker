@@ -269,6 +269,12 @@ export class JournalService {
         return duration < 0 ? 0 : Math.round(duration * 10) / 10; // Round to 1 decimal place
     }
 
+    private hasExistingSleepNoteEntry(content: string, date: string, time: string, type: string): boolean {
+        const lines = content.split('\n');
+        const searchEntry = `| ${date} | ${time} | ${type}`;
+        return lines.some(line => line.includes(searchEntry));
+    }
+
     private async appendToSleepNote(data: MeasurementRecord): Promise<void> {
         try {
             if (!this.settings.sleepNotePath) {
@@ -285,7 +291,6 @@ export class JournalService {
                 }
                 file = await this.app.vault.create(this.settings.sleepNotePath, '# Sleep Tracking\n\n| Date | Time | Type | Duration |\n|------|------|------|----------|\n');
 
-                // Wait for file to be ready
                 const verifiedFile = await this.waitForFile(this.settings.sleepNotePath);
                 if (!verifiedFile) {
                     throw new Error('Failed to verify sleep note file after creation');
@@ -300,7 +305,6 @@ export class JournalService {
                     if (file instanceof TFile) {
                         content = await this.app.vault.read(file);
                         if (content.includes('{{')) {
-                            // File still has template markers, wait and retry
                             await new Promise(resolve => setTimeout(resolve, 500));
                             continue;
                         }
@@ -322,13 +326,13 @@ export class JournalService {
             let modifiedContent = false;
 
             if (data.asleepTime) {
-                const entry = this.settings.sleepNoteTemplate
-                    .replace('<date>', date)
-                    .replace('<time>', formattedTime)
-                    .replace('<type>', '💤 Asleep')
-                    .replace('<duration>', '') + '\n';
-
-                if (!content.includes(entry.trim())) {
+                const type = '💤 Asleep';
+                if (!this.hasExistingSleepNoteEntry(content, date, formattedTime, type)) {
+                    const entry = this.settings.sleepNoteTemplate
+                        .replace('<date>', date)
+                        .replace('<time>', formattedTime)
+                        .replace('<type>', type)
+                        .replace('<duration>', '') + '\n';
                     content = content.trim() + '\n' + entry;
                     modifiedContent = true;
                 }
@@ -346,13 +350,13 @@ export class JournalService {
                     duration = data.sleepDuration;
                 }
 
-                const entry = this.settings.sleepNoteTemplate
-                    .replace('<date>', date)
-                    .replace('<time>', formattedTime)
-                    .replace('<type>', '⏰ Awake')
-                    .replace('<duration>', duration) + '\n';
-
-                if (!content.includes(entry.trim())) {
+                const type = '⏰ Awake';
+                if (!this.hasExistingSleepNoteEntry(content, date, formattedTime, type)) {
+                    const entry = this.settings.sleepNoteTemplate
+                        .replace('<date>', date)
+                        .replace('<time>', formattedTime)
+                        .replace('<type>', type)
+                        .replace('<duration>', duration) + '\n';
                     content = content.trim() + '\n' + entry;
                     modifiedContent = true;
                 }
