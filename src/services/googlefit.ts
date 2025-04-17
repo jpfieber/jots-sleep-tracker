@@ -56,12 +56,16 @@ export class GoogleFitService {
     private lastRequestTime = 0;
     private readonly minRequestInterval = 1000; // 1 second between requests
     private oauthServer: OAuthCallbackServer;
+    private moment = (window as any).moment;
 
     constructor(
         private settings: Settings,
         private config: GoogleFitServiceConfig
     ) {
         this.oauthServer = new OAuthCallbackServer(config.app);
+        if (!this.moment) {
+            throw new Error('Moment.js is required');
+        }
     }
 
     private async rateLimit() {
@@ -331,6 +335,14 @@ export class GoogleFitService {
             console.error('Failed to add Google Fit measurement:', error);
             throw error;
         }
+    }
+
+    private formatTimeAndDate(timestamp: number): { timeStr: string, dateStr: string } {
+        const m = this.moment(timestamp * 1000);
+        return {
+            timeStr: m.format('HH:mm'),
+            dateStr: m.format('YYYY-MM-DD')
+        };
     }
 
     async getSleepMeasurements(startTime: number, endTime: number): Promise<GoogleFitSleepMeasurement[]> {

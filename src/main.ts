@@ -13,10 +13,12 @@ export default class SleepTrackerPlugin extends Plugin {
     googleFitService?: GoogleFitService;
     googleFitSyncInterval?: number;
     styleManager!: StyleManager;
+    journalService!: JournalService;
 
     async onload() {
         await this.loadSettings();
         this.measurementService = new MeasurementService(this.app, this.settings);
+        this.journalService = new JournalService(this.app, this.settings);
 
         // Initialize style manager and apply styles
         this.styleManager = new StyleManager();
@@ -57,6 +59,8 @@ export default class SleepTrackerPlugin extends Plugin {
 
     async saveSettings() {
         await this.saveData(this.settings);
+        // Update services with new settings
+        this.journalService = new JournalService(this.app, this.settings);
         // Update any open settings tabs
         const settingTab = (this.app as any).setting?.activeTab;
         if (settingTab?.id === 'jots-sleep-tracker') {
@@ -232,14 +236,12 @@ export default class SleepTrackerPlugin extends Plugin {
 
         // Add to journal entry
         if (this.settings.enableJournalEntry) {
-            const journalService = new JournalService(this.app, this.settings);
-            await journalService.appendToJournal(data);
+            await this.journalService.appendToJournal(data);
         }
 
         // Add to sleep note
         if (this.settings.enableSleepNote) {
-            const journalService = new JournalService(this.app, this.settings);
-            await journalService.appendToSleepNote(data);
+            await this.journalService.appendToSleepNote(data);
         }
     }
 

@@ -1,100 +1,7 @@
-.default-user-star {
-    color: gold;
-    margin-left: 8px;
-}
-
-.settings-indent {
-    margin-left: 24px !important;
-}
-
-.settings-separator {
-    border-bottom: 1px solid var(--background-modifier-border);
-    margin: 2em 0;
-}
-
-.measurements-list {
-    margin: 12px 0;
-}
-
-.measurements-list .setting-item {
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
-    margin: 4px 0;
-    padding: 8px;
-}
-
-.measurements-list .setting-item:hover {
-    background-color: var(--background-modifier-hover);
-}
-
-.measurements-table-header {
-    display: grid;
-    grid-template-columns: minmax(150px, 2fr) minmax(150px, 2fr) minmax(100px, 1fr);
-    gap: 12px;
-    padding: 8px;
-    margin-bottom: 8px;
-    font-weight: bold;
-    border-bottom: 1px solid var(--background-modifier-border);
-    align-items: center;
-}
-
-.measurements-table-row {
-    display: grid;
-    grid-template-columns: minmax(100px, 2fr) minmax(100px, 2fr) minmax(100px, 1fr);
-    padding: 2px;
-    margin: 2px 0;
-    align-items: center;
-}
-
-.measurements-table-row:hover {
-    background-color: var(--background-modifier-hover);
-}
-
-.measurements-name-cell {
-    font-size: 14px;
-}
-
-.measurements-unit-cell {
-    display: flex;
-    align-items: left;
-}
-
-.measurements-unit-cell .setting-item {
-    margin: 0;
-    padding: 0;
-}
-
-.measurements-controls-cell {
-    display: flex;
-    gap: 4px;
-    justify-content: flex-end;
-}
-
-.measurements-add-row {
-    margin: 0 !important;
-    padding: 0 !important;
-}
-
-.measurements-add-row .setting-item-info {
-    display: none;
-}
-
-.measurements-add-row .setting-item-control {
-    display: grid;
-    grid-template-columns: minmax(150px, 2fr) minmax(150px, 2fr) minmax(100px, 1fr);
-    gap: 12px;
-    width: 100%;
-    justify-content: start;
-}
-
-.setting-item-control .clickable-icon {
-    padding: 4px;
-}
-
-.setting-item-control .clickable-icon:hover {
-    background-color: var(--background-modifier-hover);
-}
-
+/* =================
+   Obsidian Core Overrides
+   These styles are from Obsidian core and remain unprefixed
+   ================= */
 .suggestion-container {
     position: absolute;
     z-index: 100;
@@ -120,41 +27,239 @@
     color: var(--text-on-accent);
 }
 
-/* Style for measurement entries */
-.body-measurement-entry {
+/* =================
+   Settings UI Styles
+   Styles for the plugin settings tab
+   ================= */
+.jots-sleep-tracker-settings-indent {
+    margin-left: 24px !important;
+    padding-left: 2em;
+}
+
+.jots-sleep-tracker-settings-separator {
+    border-bottom: 1px solid var(--background-modifier-border);
+    margin: 2em 0;
+}
+
+.jots-sleep-tracker-default-user-star {
+    color: var(--text-accent);
+    margin-left: 0.5em;
+}
+
+/* =================
+   Sleep Record Entry Styles
+   Styles for sleep record items in notes
+   ================= */
+.jots-sleep-tracker-sleep-record-entry {
     position: relative;
     padding-left: 24px;
     margin: 4px 0;
 }
 
-/* Hide the original task marker */
-.body-measurement-entry .task-list-item-checkbox {
+.jots-sleep-tracker-sleep-record-entry::before {
+    content: "💤";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+}
+
+.jots-sleep-tracker-sleep-record-entry .task-list-item-checkbox {
     display: none;
 }
 
-/* Base styles for measurement entries */
-.markdown-preview-view ul>li.task-list-item {
+/* Sleep quality indicators */
+.jots-sleep-tracker-sleep-quality-good {
+    color: var(--text-success);
+}
+
+.jots-sleep-tracker-sleep-quality-medium {
+    color: var(--text-warning);
+}
+
+.jots-sleep-tracker-sleep-quality-poor {
+    color: var(--text-error);
+}
+
+/* =================
+   Modal Styles
+   Styles for the sleep entry modal
+   ================= */
+.jots-sleep-tracker-measurements-container {
+    max-height: 300px;
+    overflow-y: auto;
+    margin: 1em 0;
+}
+
+.jots-sleep-tracker-date-time-container {
+    display: flex;
+    gap: 1em;
+    margin-bottom: 1em;
+}
+
+.jots-sleep-tracker-date-time-container .date-setting {
+    flex: 2;
+}
+
+.jots-sleep-tracker-date-time-container .time-setting {
+    flex: 1;
+}
+
+/* =================
+   Measurement Table Styles
+   Styles for measurement management tables
+   ================= */
+.jots-sleep-tracker-measurements-list {
+    margin: 1em 0;
+}
+
+.jots-sleep-tracker-measurements-list .setting-item {
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
     margin: 4px 0;
+    padding: 8px;
 }
 
-.markdown-preview-view ul>li.task-list-item input.task-list-item-checkbox {
-    display: none !important;
+.jots-sleep-tracker-measurements-list .setting-item:hover {
+    background-color: var(--background-modifier-hover);
 }
 
-/* Website Description: Styles for the text description in the website section */
-.website-description {
+/* Table layout */
+.jots-sleep-tracker-measurements-table-header,
+.jots-sleep-tracker-measurements-table-row {
+    display: grid;
+    grid-template-columns: 2fr 2fr 1fr;
+    gap: 1em;
+    padding: 0.5em;
+    align-items: center;
+}
+
+.jots-sleep-tracker-measurements-table-header {
+    margin-bottom: 8px;
+    font-weight: bold;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.jots-sleep-tracker-measurements-table-row:nth-child(even) {
+    background-color: var(--background-modifier-hover);
+}
+
+.jots-sleep-tracker-measurements-table-row:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+/* Table cells */
+.jots-sleep-tracker-measurements-name-cell {
+    font-size: 14px;
+}
+
+.jots-sleep-tracker-measurements-name-cell input,
+.jots-sleep-tracker-measurements-unit-cell select {
+    width: 100%;
+    padding: 4px;
+}
+
+.jots-sleep-tracker-measurements-unit-cell {
+    display: flex;
+    align-items: left;
+}
+
+.jots-sleep-tracker-measurements-unit-cell .setting-item {
+    margin: 0;
+    padding: 0;
+}
+
+.jots-sleep-tracker-measurements-controls-cell {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+}
+
+.jots-sleep-tracker-measurement-unit {
+    opacity: 0.7;
+    margin-left: 0.5em;
+}
+
+/* =================
+   Google Fit Sync UI
+   Styles for the Google Fit sync interface
+   ================= */
+.jots-sleep-tracker-sync-controls {
+    padding: 10px;
+    margin-bottom: 20px;
+}
+
+.jots-sleep-tracker-date-inputs {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.jots-sleep-tracker-destination-options {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+/* Progress bar */
+.jots-sleep-tracker-progress-container {
+    width: 100%;
+    height: 4px;
+    background-color: var(--background-modifier-border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.jots-sleep-tracker-progress-bar {
+    width: 0%;
+    height: 100%;
+    background-color: var(--interactive-accent);
+    transition: width 0.3s ease;
+}
+
+.jots-sleep-tracker-progress-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+}
+
+.jots-sleep-tracker-progress-text {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.jots-sleep-tracker-cancel-button {
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
+/* =================
+   Website Section
+   Styles for the website and donation sections
+   ================= */
+.jots-sleep-tracker-website-section {
+    margin: 2em 0;
+    text-align: center;
+}
+
+.jots-sleep-tracker-website-description {
     font-size: 14px;
     line-height: 1.5;
     color: #555;
 }
 
-/* Buy Me a Coffee Section: Styles for the donation section */
-.buy-me-a-coffee {
+.jots-sleep-tracker-buy-me-coffee {
     margin-top: 20px;
     text-align: center;
 }
 
-.buy-me-a-coffee img {
+.jots-sleep-tracker-buy-me-coffee img {
     height: 60px;
     width: 217px;
 }

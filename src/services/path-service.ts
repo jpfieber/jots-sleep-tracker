@@ -1,11 +1,11 @@
 import type { Settings } from '../types';
 
-export function getJournalPath(date: string, settings: Settings): string {
-    const moment = (window as any).moment;
-    if (!moment) {
-        throw new Error('Moment.js is required');
-    }
+const moment = (window as any).moment;
+if (!moment) {
+    throw new Error('Moment.js is required');
+}
 
+export function getJournalPath(date: string, settings: Settings): string {
     // Create and validate the moment object
     const [year, month, day] = date.split('-').map(num => parseInt(num, 10));
     const mDate = moment([year, month - 1, day]).hours(12);

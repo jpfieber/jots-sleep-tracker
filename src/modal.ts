@@ -1,4 +1,4 @@
-import { App, Modal, Setting } from 'obsidian';
+import { App, Modal, Setting, Notice } from 'obsidian';
 import type { Settings, MeasurementRecord } from './types';
 
 export class MeasurementModal extends Modal {
@@ -11,13 +11,12 @@ export class MeasurementModal extends Modal {
         currentTime?: string;
     } = {
             addToJournal: true,
-            addToSleepNote: false  // Default to false to match settings default
+            addToSleepNote: false
         };
 
     constructor(app: App, private plugin: any) {
         super(app);
         this.settings = plugin.settings;
-        // Initialize values based on current settings
         this.values.addToJournal = this.settings.enableJournalEntry;
         this.values.addToSleepNote = this.settings.enableSleepNote;
     }
@@ -26,13 +25,10 @@ export class MeasurementModal extends Modal {
         const { contentEl } = this;
         contentEl.empty();
 
-        // Title
         contentEl.createEl('h2', { text: 'Add Sleep Record' });
 
-        // Create a container for date and time
-        const dateTimeContainer = contentEl.createDiv('date-time-container');
+        const dateTimeContainer = contentEl.createDiv({ cls: 'jots-sleep-tracker-date-time-container' });
 
-        // Date picker
         new Setting(dateTimeContainer)
             .setName('Date')
             .setClass('date-setting')
@@ -44,7 +40,6 @@ export class MeasurementModal extends Modal {
                 return text;
             });
 
-        // Time picker
         new Setting(dateTimeContainer)
             .setName('Time')
             .setClass('time-setting')
@@ -53,7 +48,6 @@ export class MeasurementModal extends Modal {
                 const moment = (window as any).moment;
                 const now = moment().format('HH:mm');
                 text.setValue(now);
-                // Set initial value in component state
                 this.values.currentTime = now;
                 text.onChange((value) => {
                     this.values.currentTime = value;
@@ -61,7 +55,6 @@ export class MeasurementModal extends Modal {
                 return text;
             });
 
-        // Sleep state dropdown
         new Setting(contentEl)
             .setName('State')
             .addDropdown(dropdown => {
@@ -69,7 +62,6 @@ export class MeasurementModal extends Modal {
                     .addOption('asleep', 'Asleep')
                     .addOption('awake', 'Awake')
                     .setValue('asleep');
-                // Set initial state
                 if (this.values.currentTime) {
                     this.values.asleepTime = this.values.currentTime;
                     this.values.awakeTime = undefined;
@@ -87,12 +79,10 @@ export class MeasurementModal extends Modal {
                 });
             });
 
-        // Only show these options if they are configured in settings
         if (this.settings.enableJournalEntry || this.settings.enableSleepNote) {
             contentEl.createEl('h3', { text: 'Save Options' });
         }
 
-        // Checkbox for adding to journal - only show if journal entries are enabled in settings
         if (this.settings.enableJournalEntry) {
             new Setting(contentEl)
                 .setName('Add to Journal')
@@ -106,7 +96,6 @@ export class MeasurementModal extends Modal {
                 });
         }
 
-        // Checkbox for adding to sleep note - only show if sleep note is enabled and configured in settings
         if (this.settings.enableSleepNote && this.settings.sleepNotePath) {
             new Setting(contentEl)
                 .setName('Add to Sleep Note')
@@ -120,7 +109,6 @@ export class MeasurementModal extends Modal {
                 });
         }
 
-        // Submit button
         new Setting(contentEl)
             .addButton(btn => btn
                 .setButtonText('Submit')
@@ -130,13 +118,11 @@ export class MeasurementModal extends Modal {
                     const timeStr = this.values.currentTime;
                     const stateSelect = contentEl.querySelector('.dropdown') as HTMLSelectElement;
 
-                    // Validate all required fields
                     if (!dateStr || !timeStr || !stateSelect?.value) {
                         new Notice('Please fill in all required fields');
                         return;
                     }
 
-                    // Store original settings before any changes
                     const originalJournalSetting = this.settings.enableJournalEntry;
                     const originalSleepNoteSetting = this.settings.enableSleepNote;
 
@@ -150,7 +136,6 @@ export class MeasurementModal extends Modal {
                             measurementData.asleepTime = timeStr;
                         } else {
                             measurementData.awakeTime = timeStr;
-                            // Calculate duration if we have both times
                             if (this.values.asleepTime) {
                                 const asleepMoment = (window as any).moment(`${dateStr} ${this.values.asleepTime}`, 'YYYY-MM-DD HH:mm');
                                 const awakeMoment = (window as any).moment(`${dateStr} ${timeStr}`, 'YYYY-MM-DD HH:mm');
@@ -161,7 +146,6 @@ export class MeasurementModal extends Modal {
 
                         console.log('Sending measurement data:', measurementData);
 
-                        // Temporarily override settings based on user's choices
                         this.settings.enableJournalEntry = this.settings.enableJournalEntry && this.values.addToJournal;
                         this.settings.enableSleepNote = this.settings.enableSleepNote && this.values.addToSleepNote;
 
@@ -172,7 +156,6 @@ export class MeasurementModal extends Modal {
                         console.error('Failed to save sleep record:', error);
                         new Notice('Failed to save sleep record. Please try again.');
                     } finally {
-                        // Restore original settings
                         this.settings.enableJournalEntry = originalJournalSetting;
                         this.settings.enableSleepNote = originalSleepNoteSetting;
                     }
@@ -184,27 +167,3 @@ export class MeasurementModal extends Modal {
         contentEl.empty();
     }
 }
-
-// Add some CSS
-document.head.createEl('style').setText(`
-.measurements-container {
-    max-height: 300px;
-    overflow-y: auto;
-    margin: 1em 0;
-}
-.measurement-unit {
-    opacity: 0.7;
-    margin-left: 0.5em;
-}
-.date-time-container {
-    display: flex;
-    gap: 1em;
-    margin-bottom: 1em;
-}
-.date-time-container .date-setting {
-    flex: 2;
-}
-.date-time-container .time-setting {
-    flex: 1;
-}
-`);

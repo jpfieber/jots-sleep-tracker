@@ -6,6 +6,7 @@ import SleepTrackerPlugin from './main';
 
 export class SleepTrackerSettingsTab extends PluginSettingTab {
     plugin: SleepTrackerPlugin;
+    private boundHandlers: Array<{ element: HTMLElement, type: string, handler: EventListener }> = [];
 
     constructor(app: App, plugin: SleepTrackerPlugin) {
         super(app, plugin);
@@ -13,13 +14,22 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
     }
 
     show() {
-        super.show();
         // Force a fresh display when tab is shown
         setTimeout(() => this.display(), 0);
     }
 
     hide() {
+        // Clean up event listeners when tab is hidden
+        this.boundHandlers.forEach(({ element, type, handler }) => {
+            element.removeEventListener(type, handler);
+        });
+        this.boundHandlers = [];
         super.hide();
+    }
+
+    private addSafeEventListener(element: HTMLElement, type: string, handler: EventListener) {
+        element.addEventListener(type, handler);
+        this.boundHandlers.push({ element, type, handler });
     }
 
     display(): void {
@@ -42,7 +52,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
             new Setting(containerEl)
                 .setName('Client ID')
                 .setDesc('Your Google Fit API Client ID')
-                .setClass('settings-indent')
+                .setClass('jots-sleep-tracker-settings-indent')
                 .addText(text => text
                     .setPlaceholder('Enter Client ID')
                     .setValue(this.plugin.settings.googleClientId || '')
@@ -55,7 +65,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
             new Setting(containerEl)
                 .setName('Client Secret')
                 .setDesc('Your Google Fit API Client Secret')
-                .setClass('settings-indent')
+                .setClass('jots-sleep-tracker-settings-indent')
                 .addText(text => text
                     .setPlaceholder('Enter Client Secret')
                     .setValue(this.plugin.settings.googleClientSecret || '')
@@ -69,7 +79,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
             const authSetting = new Setting(containerEl)
                 .setName('Connection Status')
                 .setDesc(`Status: ${isConnected ? 'Connected' : 'Not Connected'}`)
-                .setClass('settings-indent');
+                .setClass('jots-sleep-tracker-settings-indent');
 
             if (this.plugin.settings.googleClientId && this.plugin.settings.googleClientSecret) {
                 authSetting.addButton(button => button
@@ -97,7 +107,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                 new Setting(containerEl)
                     .setName('Auto-Sync Interval')
                     .setDesc('How often to automatically sync with Google Fit (in minutes, 0 to disable)')
-                    .setClass('settings-indent')
+                    .setClass('jots-sleep-tracker-settings-indent')
                     .addText(text => text
                         .setPlaceholder('60')
                         .setValue(String(this.plugin.settings.googleAutoSyncInterval || 0))
@@ -109,22 +119,12 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                         }));
 
                 // Manual sync section now as a subsection
-                const manualSyncHeader = containerEl.createEl('div', { cls: 'settings-indent' });
+                const manualSyncHeader = containerEl.createEl('div', { cls: 'jots-sleep-tracker-settings-indent' });
                 manualSyncHeader.createEl('h4', { text: 'Manual Data Sync' });
                 manualSyncHeader.createEl('p', { text: 'Useful for retrieving old data when you first start using the plugin, or grabbing data you missed if you haven\'t used Obsidian in over a week.' });
 
-                const syncDiv = manualSyncHeader.createDiv('sync-controls');
-                syncDiv.style.padding = '10px';
-                syncDiv.style.marginBottom = '20px';
-
-                // Date inputs in a single row
-                const dateInputsDiv = syncDiv.createDiv();
-                dateInputsDiv.style.display = 'flex';
-                dateInputsDiv.style.gap = '20px';
-                dateInputsDiv.style.alignItems = 'center';
-                dateInputsDiv.style.marginBottom = '15px';
-
-                // Start date input
+                const syncDiv = manualSyncHeader.createDiv({ cls: 'jots-sleep-tracker-sync-controls' });
+                const dateInputsDiv = syncDiv.createDiv({ cls: 'jots-sleep-tracker-date-inputs' });
                 const startDateDiv = dateInputsDiv.createDiv();
                 startDateDiv.createEl('label', { text: 'Start Date: ' }).style.marginRight = '5px';
                 const startDateInput = startDateDiv.createEl('input', {
@@ -134,12 +134,14 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                         value: this.plugin.settings.lastSyncStartDate || ''
                     }
                 });
-                startDateInput.addEventListener('change', async () => {
-                    this.plugin.settings.lastSyncStartDate = startDateInput.value;
-                    await this.plugin.saveSettings();
-                });
+                if (startDateInput) {
+                    const startDateHandler = async () => {
+                        this.plugin.settings.lastSyncStartDate = startDateInput.value;
+                        await this.plugin.saveSettings();
+                    };
+                    this.addSafeEventListener(startDateInput, 'change', startDateHandler);
+                }
 
-                // End date input
                 const endDateDiv = dateInputsDiv.createDiv();
                 endDateDiv.createEl('label', { text: 'End Date: ' }).style.marginRight = '5px';
                 const endDateInput = endDateDiv.createEl('input', {
@@ -149,20 +151,19 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                         value: this.plugin.settings.lastSyncEndDate || ''
                     }
                 });
-                endDateInput.addEventListener('change', async () => {
-                    this.plugin.settings.lastSyncEndDate = endDateInput.value;
-                    await this.plugin.saveSettings();
-                });
+                if (endDateInput) {
+                    const endDateHandler = async () => {
+                        this.plugin.settings.lastSyncEndDate = endDateInput.value;
+                        await this.plugin.saveSettings();
+                    };
+                    this.addSafeEventListener(endDateInput, 'change', endDateHandler);
+                }
 
                 // Add sync destination options
-                const destinationDiv = syncDiv.createDiv();
-                destinationDiv.style.display = 'flex';
-                destinationDiv.style.gap = '20px';
-                destinationDiv.style.alignItems = 'center';
-                destinationDiv.style.marginBottom = '15px';
+                const destinationDiv = syncDiv.createDiv({ cls: 'jots-sleep-tracker-destination-options' });
 
                 // Journal entry checkbox
-                const journalDiv = destinationDiv.createDiv();
+                const journalDiv = destinationDiv.createDiv('jots-sleep-tracker-settings-indent');
                 journalDiv.style.display = 'flex';
                 journalDiv.style.alignItems = 'center';
                 journalDiv.style.gap = '5px';
@@ -188,51 +189,34 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                 sleepNoteDiv.createEl('span', { text: 'Add to Sleep Note' });
 
                 // Save checkbox states when changed
-                journalCheck.addEventListener('change', async () => {
-                    this.plugin.settings.lastSyncJournalEnabled = journalCheck.checked;
-                    await this.plugin.saveSettings();
-                });
+                if (journalCheck) {
+                    const journalHandler = async () => {
+                        this.plugin.settings.lastSyncJournalEnabled = journalCheck.checked;
+                        await this.plugin.saveSettings();
+                    };
+                    this.addSafeEventListener(journalCheck, 'change', journalHandler);
+                }
 
-                sleepNoteCheck.addEventListener('change', async () => {
-                    this.plugin.settings.lastSyncSleepNoteEnabled = sleepNoteCheck.checked;
-                    await this.plugin.saveSettings();
-                });
+                if (sleepNoteCheck) {
+                    const sleepNoteHandler = async () => {
+                        this.plugin.settings.lastSyncSleepNoteEnabled = sleepNoteCheck.checked;
+                        await this.plugin.saveSettings();
+                    };
+                    this.addSafeEventListener(sleepNoteCheck, 'change', sleepNoteHandler);
+                }
 
                 // Progress container with progress bar and cancel button
                 const progressDiv = syncDiv.createDiv();
-                progressDiv.style.marginBottom = '15px';
-                progressDiv.style.display = 'none'; // Hide initially
+                progressDiv.style.display = 'none'; // This needs to stay as it's dynamically toggled
 
-                const progressBarContainer = progressDiv.createDiv('progress-container');
-                progressBarContainer.style.width = '100%';
-                progressBarContainer.style.height = '4px';
-                progressBarContainer.style.backgroundColor = 'var(--background-modifier-border)';
-                progressBarContainer.style.borderRadius = '2px';
-                progressBarContainer.style.overflow = 'hidden';
-                progressBarContainer.style.marginBottom = '8px';
-
-                const progressBar = progressBarContainer.createDiv('progress-bar');
-                progressBar.style.width = '0%';
-                progressBar.style.height = '100%';
-                progressBar.style.backgroundColor = 'var(--interactive-accent)';
-                progressBar.style.transition = 'width 0.3s ease';
-
-                const progressStatusDiv = progressDiv.createDiv();
-                progressStatusDiv.style.display = 'flex';
-                progressStatusDiv.style.justifyContent = 'space-between';
-                progressStatusDiv.style.alignItems = 'center';
-                progressStatusDiv.style.marginTop = '8px';
-
-                const progressText = progressStatusDiv.createSpan();
-                progressText.style.fontSize = '12px';
-                progressText.style.color = 'var(--text-muted)';
-
+                const progressBarContainer = progressDiv.createDiv('jots-sleep-tracker-progress-container');
+                const progressBar = progressBarContainer.createDiv('jots-sleep-tracker-progress-bar');
+                const progressStatusDiv = progressDiv.createDiv('jots-sleep-tracker-progress-status');
+                const progressText = progressStatusDiv.createSpan({ cls: 'jots-sleep-tracker-progress-text' });
                 const cancelButton = progressStatusDiv.createEl('button', {
                     text: 'Cancel',
-                    cls: 'mod-warning'
+                    cls: ['mod-warning', 'jots-sleep-tracker-cancel-button']
                 });
-                cancelButton.style.padding = '4px 8px';
-                cancelButton.style.fontSize = '12px';
 
                 // Single sync button
                 const buttonDiv = syncDiv.createDiv();
@@ -337,7 +321,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
             new Setting(containerEl)
                 .setName('Journal Folder')
                 .setDesc('Root folder where your daily journal entries are stored')
-                .setClass('settings-indent')
+                .setClass('jots-sleep-tracker-settings-indent')
                 .addSearch((cb) => {
                     new FolderSuggest(this.app, cb.inputEl);
                     cb.setPlaceholder("Journal")
@@ -351,7 +335,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
             new Setting(containerEl)
                 .setName('Journal Subdirectory Format')
                 .setDesc('Format for organizing journal files in subfolders (e.g. YYYY/YYYY-MM)')
-                .setClass('settings-indent')
+                .setClass('jots-sleep-tracker-settings-indent')
                 .addText(text => text
                     .setPlaceholder('YYYY/YYYY-MM')
                     .setValue(this.plugin.settings.journalSubDirectory)
@@ -363,7 +347,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
             new Setting(containerEl)
                 .setName('Journal Name Format')
                 .setDesc('Format for journal filenames (e.g. YYYY-MM-DD_ddd for 2025-04-13_Sun)')
-                .setClass('settings-indent')
+                .setClass('jots-sleep-tracker-settings-indent')
                 .addText(text => text
                     .setPlaceholder('YYYY-MM-DD_ddd')
                     .setValue(this.plugin.settings.journalNameFormat)
@@ -375,7 +359,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
             new Setting(containerEl)
                 .setName('Daily Note Template')
                 .setDesc('Template file to use when creating new daily notes (.md files only)')
-                .setClass('settings-indent')
+                .setClass('jots-sleep-tracker-settings-indent')
                 .addSearch((cb) => {
                     new FileSuggest(this.app, cb.inputEl);
                     cb.setPlaceholder("templates/daily.md")
@@ -389,7 +373,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
             new Setting(containerEl)
                 .setName('Asleep Entry Format')
                 .setDesc('Format for the asleep time part of the entry. Use <time> (eg. 2:00PM) or <mtime> (eg. 14:00) as placeholder for the time.')
-                .setClass('settings-indent')
+                .setClass('jots-sleep-tracker-settings-indent')
                 .addText(text => text
                     .setPlaceholder('(time:: <mtime>) (type:: 💤) Asleep')
                     .setValue(this.plugin.settings.asleepEntryTemplate)
@@ -401,7 +385,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
             new Setting(containerEl)
                 .setName('Awake Entry Format')
                 .setDesc('Format for the wake time and duration entry. Use <time> (eg. 2:00PM) or <mtime> (eg. 14:00) for wake time and <duration> for duration.')
-                .setClass('settings-indent')
+                .setClass('jots-sleep-tracker-settings-indent')
                 .addText(text => text
                     .setPlaceholder('(time:: <mtime>) (type::⏰) Awake ((duration:: <duration>) hours of sleep)')
                     .setValue(this.plugin.settings.awakeEntryTemplate)
@@ -413,7 +397,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
             new Setting(containerEl)
                 .setName('Task SVG Icon')
                 .setDesc('Data URI for the SVG icon to use for sleep entries')
-                .setClass('settings-indent')
+                .setClass('jots-sleep-tracker-settings-indent')
                 .addText(text => text
                     .setPlaceholder("${SVG_ICON")
                     .setValue(this.plugin.settings.taskSvgIcon)
@@ -425,7 +409,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
             new Setting(containerEl)
                 .setName('Task Prefix')
                 .setDesc('The letter to use as prefix in sleep entries (e.g. "s" for "- [s]")')
-                .setClass('settings-indent')
+                .setClass('jots-sleep-tracker-settings-indent')
                 .addText(text => text
                     .setPlaceholder('s')
                     .setValue(this.plugin.settings.stringPrefixLetter)
@@ -451,7 +435,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
             new Setting(containerEl)
                 .setName('Sleep Note Location')
                 .setDesc('Path to your dedicated sleep tracking note')
-                .setClass('settings-indent')
+                .setClass('jots-sleep-tracker-settings-indent')
                 .addSearch((cb) => {
                     new FileSuggest(this.app, cb.inputEl);
                     cb.setPlaceholder("Sleep/sleep-tracking.md")
@@ -465,7 +449,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
             new Setting(containerEl)
                 .setName('Sleep Note Entry Format')
                 .setDesc('Template for sleep entries. Use <date>, <time>, <mtime>, <type>, and <duration> as placeholders')
-                .setClass('settings-indent')
+                .setClass('jots-sleep-tracker-settings-indent')
                 .addText(text => text
                     .setPlaceholder('| <date> | <time> | <type> | <duration> |')
                     .setValue(this.plugin.settings.sleepNoteTemplate)
@@ -481,7 +465,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
     }
 
     private addWebsiteSection(containerEl: HTMLElement) {
-        const websiteDiv = containerEl.createEl('div', { cls: 'website-section' });
+        const websiteDiv = containerEl.createEl('div', { cls: 'jots-sleep-tracker-website-section' });
 
         const logoLink = websiteDiv.createEl('a', { href: 'https://jots.life' });
         logoLink.setAttribute('target', '_blank');
@@ -493,7 +477,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
             },
         });
 
-        const descriptionDiv = websiteDiv.createEl('div', { cls: 'website-description' });
+        const descriptionDiv = websiteDiv.createEl('div', { cls: 'jots-sleep-tracker-website-description' });
 
         descriptionDiv.appendText('While this plugin works on its own, it is part of a system called ');
         const jotsLink = descriptionDiv.createEl('a', {
@@ -505,7 +489,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
     }
 
     private addCoffeeSection(containerEl: HTMLElement) {
-        const coffeeDiv = containerEl.createEl('div', { cls: 'buy-me-a-coffee' });
+        const coffeeDiv = containerEl.createEl('div', { cls: 'jots-sleep-tracker-buy-me-coffee' });
 
         const coffeeLink = coffeeDiv.createEl('a', {
             href: 'https://www.buymeacoffee.com/jpfieber'
@@ -517,7 +501,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                 src: 'https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png',
                 alt: 'Buy Me A Coffee'
             },
-            cls: 'bmc-button'
+            cls: 'jots-sleep-tracker-bmc-button'
         });
     }
 }
