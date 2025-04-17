@@ -14,6 +14,14 @@ export class JournalService {
         const moment = (window as any).moment;
         if (!timeStr) return '';
         const time = moment(timeStr, 'HH:mm');
+        return time.isValid() ? time.format('h:mmA') : timeStr;
+    }
+
+    private formatMilitaryTime(timeStr: string): string {
+        // Format time in 24-hour format
+        const moment = (window as any).moment;
+        if (!timeStr) return '';
+        const time = moment(timeStr, 'HH:mm');
         return time.isValid() ? time.format('HH:mm') : timeStr;
     }
 
@@ -323,6 +331,7 @@ export class JournalService {
 
             const [date, time] = data.date.split(' ');
             const formattedTime = this.formatTime(time);
+            const militaryTime = this.formatMilitaryTime(time);
             let modifiedContent = false;
 
             if (data.asleepTime) {
@@ -331,6 +340,7 @@ export class JournalService {
                     const entry = this.settings.sleepNoteTemplate
                         .replace('<date>', date)
                         .replace('<time>', formattedTime)
+                        .replace('<mtime>', militaryTime)
                         .replace('<type>', type)
                         .replace('<duration>', '') + '\n';
                     content = content.trim() + '\n' + entry;
@@ -355,6 +365,7 @@ export class JournalService {
                     const entry = this.settings.sleepNoteTemplate
                         .replace('<date>', date)
                         .replace('<time>', formattedTime)
+                        .replace('<mtime>', militaryTime)
                         .replace('<type>', type)
                         .replace('<duration>', duration) + '\n';
                     content = content.trim() + '\n' + entry;
@@ -394,9 +405,11 @@ export class JournalService {
                 if (data.asleepTime) {
                     const [date, time] = data.date.split(' ');
                     const formattedTime = this.formatTime(time);
+                    const militaryTime = this.formatMilitaryTime(time);
                     console.log('JournalService: Adding asleep entry for date:', date, 'time:', formattedTime);
                     const asleepEntry = prefix + this.settings.asleepEntryTemplate
-                        .replace('<time>', formattedTime) + '\n';
+                        .replace('<time>', formattedTime)
+                        .replace('<mtime>', militaryTime) + '\n';
                     console.log('JournalService: Generated asleep entry:', asleepEntry);
                     await this.appendEntry(date, asleepEntry);
                 }
@@ -404,6 +417,7 @@ export class JournalService {
                 if (data.awakeTime) {
                     const [date, time] = data.date.split(' ');
                     const formattedTime = this.formatTime(time);
+                    const militaryTime = this.formatMilitaryTime(time);
                     let duration = '0.0';
 
                     if (!data.sleepDuration) {
@@ -419,6 +433,7 @@ export class JournalService {
                     console.log('JournalService: Adding awake entry for date:', date, 'time:', formattedTime);
                     const awakeEntry = prefix + this.settings.awakeEntryTemplate
                         .replace('<time>', formattedTime)
+                        .replace('<mtime>', militaryTime)
                         .replace('<duration>', duration) + '\n';
                     console.log('JournalService: Generated awake entry:', awakeEntry);
                     await this.appendEntry(date, awakeEntry);
