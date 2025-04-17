@@ -395,18 +395,6 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                     }));
 
             new Setting(containerEl)
-                .setName('Task SVG Icon')
-                .setDesc('Data URI for the SVG icon to use for sleep entries')
-                .setClass('jots-sleep-tracker-settings-indent')
-                .addText(text => text
-                    .setPlaceholder("${SVG_ICON")
-                    .setValue(this.plugin.settings.taskSvgIcon)
-                    .onChange(async (value) => {
-                        this.plugin.settings.taskSvgIcon = value;
-                        await this.plugin.saveSettings();
-                    }));
-
-            new Setting(containerEl)
                 .setName('Task Prefix')
                 .setDesc('The letter to use as prefix in sleep entries (e.g. "s" for "- [s]")')
                 .setClass('jots-sleep-tracker-settings-indent')
@@ -415,6 +403,18 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                     .setValue(this.plugin.settings.stringPrefixLetter)
                     .onChange(async (value) => {
                         this.plugin.settings.stringPrefixLetter = value;
+                        await this.plugin.saveSettings();
+                    }));
+
+            new Setting(containerEl)
+                .setName('Task SVG Icon')
+                .setDesc('Data URI for the SVG icon to use for sleep entries')
+                .setClass('jots-sleep-tracker-settings-indent')
+                .addText(text => text
+                    .setPlaceholder("${SVG_ICON")
+                    .setValue(this.plugin.settings.taskSvgIcon)
+                    .onChange(async (value) => {
+                        this.plugin.settings.taskSvgIcon = value;
                         await this.plugin.saveSettings();
                     }));
         }
@@ -447,14 +447,26 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                 });
 
             new Setting(containerEl)
-                .setName('Sleep Note Entry Format')
-                .setDesc('Template for sleep entries. Use <date>, <time>, <mtime>, <type>, and <duration> as placeholders')
+                .setName('Asleep Entry Format')
+                .setDesc('Template for Asleep entries. Use <date>, <time>, and <mtime> as placeholders')
                 .setClass('jots-sleep-tracker-settings-indent')
                 .addText(text => text
-                    .setPlaceholder('| <date> | <time> | <type> | <duration> |')
-                    .setValue(this.plugin.settings.sleepNoteTemplate)
+                    .setPlaceholder('| <date> | <time> (<mtime>) | 💤 Asleep | |')
+                    .setValue(this.plugin.settings.asleepNoteTemplate)
                     .onChange(async (value) => {
-                        this.plugin.settings.sleepNoteTemplate = value;
+                        this.plugin.settings.asleepNoteTemplate = value;
+                        await this.plugin.saveSettings();
+                    }));
+
+            new Setting(containerEl)
+                .setName('Awake Entry Format')
+                .setDesc('Template for Awake entries. Use <date>, <time>, <mtime>, and <duration> as placeholders')
+                .setClass('jots-sleep-tracker-settings-indent')
+                .addText(text => text
+                    .setPlaceholder('| <date> | <time> (<mtime>) | ⏰ Awake | <duration> |')
+                    .setValue(this.plugin.settings.awakeNoteTemplate)
+                    .onChange(async (value) => {
+                        this.plugin.settings.awakeNoteTemplate = value;
                         await this.plugin.saveSettings();
                     }));
         }

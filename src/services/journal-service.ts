@@ -277,9 +277,9 @@ export class JournalService {
         return duration < 0 ? 0 : Math.round(duration * 10) / 10; // Round to 1 decimal place
     }
 
-    private hasExistingSleepNoteEntry(content: string, date: string, time: string, type: string): boolean {
+    private hasExistingSleepNoteEntry(content: string, date: string, time: string): boolean {
         const lines = content.split('\n');
-        const searchEntry = `| ${date} | ${time} | ${type}`;
+        const searchEntry = `| ${date} | ${time}`;
         return lines.some(line => line.includes(searchEntry));
     }
 
@@ -335,14 +335,11 @@ export class JournalService {
             let modifiedContent = false;
 
             if (data.asleepTime) {
-                const type = '💤 Asleep';
-                if (!this.hasExistingSleepNoteEntry(content, date, formattedTime, type)) {
-                    const entry = this.settings.sleepNoteTemplate
+                if (!this.hasExistingSleepNoteEntry(content, date, formattedTime)) {
+                    const entry = this.settings.asleepNoteTemplate
                         .replace('<date>', date)
                         .replace('<time>', formattedTime)
-                        .replace('<mtime>', militaryTime)
-                        .replace('<type>', type)
-                        .replace('<duration>', '') + '\n';
+                        .replace('<mtime>', militaryTime) + '\n';
                     content = content.trim() + '\n' + entry;
                     modifiedContent = true;
                 }
@@ -360,13 +357,11 @@ export class JournalService {
                     duration = data.sleepDuration;
                 }
 
-                const type = '⏰ Awake';
-                if (!this.hasExistingSleepNoteEntry(content, date, formattedTime, type)) {
-                    const entry = this.settings.sleepNoteTemplate
+                if (!this.hasExistingSleepNoteEntry(content, date, formattedTime)) {
+                    const entry = this.settings.awakeNoteTemplate
                         .replace('<date>', date)
                         .replace('<time>', formattedTime)
                         .replace('<mtime>', militaryTime)
-                        .replace('<type>', type)
                         .replace('<duration>', duration) + '\n';
                     content = content.trim() + '\n' + entry;
                     modifiedContent = true;

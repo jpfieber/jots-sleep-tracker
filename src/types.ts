@@ -39,7 +39,8 @@ export interface Settings {
     // Sleep Note settings
     enableSleepNote: boolean;
     sleepNotePath: string;
-    sleepNoteTemplate: string;
+    asleepNoteTemplate: string;
+    awakeNoteTemplate: string;
 
     // Measurement file settings
     enableMeasurementFiles: boolean;
@@ -79,20 +80,22 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+    // Journal settings
     enableJournalEntry: true,
     journalFolder: 'Journal',
     journalSubDirectory: 'YYYY/YYYY-MM',
-    journalNameFormat: 'YYYY-MM-DD_DDD',
-    asleepEntryTemplate: '(time:: <time>) (mtime:: <mtime>) (type:: 💤) Asleep',
-    awakeEntryTemplate: '(time:: <time>) (mtime:: <mtime>) (type::⏰) Awake ((duration:: <duration>) hours of sleep)',
+    journalNameFormat: 'YYYY-MM-DD_ddd',
+    asleepEntryTemplate: '(time:: <mtime>) (type:: 💤) Asleep',
+    awakeEntryTemplate: '(time:: <mtime>) (type::⏰) Awake ((duration:: <duration>) hours of sleep)',
     stringPrefixLetter: 's',
-    decoratedTaskSymbol: '💤',
-    taskSvgIcon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxZW0iIGhlaWdodD0iMWVtIiB2aWV3Qm94PSIwIDAgMjQgMjQiPjxwYXRoIGZpbGw9ImN1cnJlbnRDb2xvciIgZD0iTTEyLjUgM2MtNS4yNSAwLTkuNSA0LjI1LTkuNSA5LjVzNC4yNSA5LjUgOS41IDkuNWM1LjI1IDAgOS41LTQuMjUgOS41LTkuNVMxNy43NSAzIDEyLjUgM20wIDJjNC4xNSAwIDcuNSAzLjM1IDcuNSA3LjVzLTMuMzUgNy41LTcuNSA3LjVTNSAxNi42NSA1IDEyLjVTOC4zNSA1IDEyLjUgNW0tMy41IDJsMS43IDEuN2gtMi45bDEuMi0xLjdtOCAwbDEuMiAxLjdoLTIuOWwxLjctMS43TTkgMTVsLTEuNy0xLjdoMi45TDkgMTVtOCAwbC0xLjItMS43aDIuOUwxNyAxNSIvPjwvc3ZnPg==',
+    decoratedTaskSymbol: '',
+    taskSvgIcon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxZW0iIGhlaWdodD0iMWVtIiB2aWV3Qm94PSIwIDAgMjQgMjQiPjxwYXRoIGZpbGw9ImN1cnJlbnRDb2xvciIgZD0iTTEyLjUgM2MtNS4yNSAwLTkuNSA0LjI1LTkuNSA5LjVzNC4yNSA5LjUgOS41IDkuNWM1LjI1IDAgOS41LTQuMjUgOS41LTkuNVMxNy43NSAzIDEyLjUgM20wIDJjNC4xNSAwIDcuNSAzLjM1IDcuNSA3LjVzLTMuMzUgNy41LTcuNSA3LjVTNSAxNy4xNSA1IDEyLjVTOC4zNSA1IDEyLjUgNW0tMiA4djZoNXYtMmgtM3YtNHoiLz48L3N2Zz4=',
 
     // Sleep Note settings
     enableSleepNote: false,
     sleepNotePath: 'Sleep/sleep-tracking.md',
-    sleepNoteTemplate: '| <date> | <time> (<mtime>) | <type> | <duration> |',
+    asleepNoteTemplate: '| <date> | <time> (<mtime>) | 💤 Asleep | |',
+    awakeNoteTemplate: '| <date> | <time> (<mtime>) | ⏰ Awake | <duration> |',
 
     enableMeasurementFiles: true,
     measurementFolder: 'Sleep',
@@ -130,6 +133,8 @@ export const DEFAULT_SETTINGS: Settings = {
     // Sync settings
     lastSyncJournalEnabled: false,
     lastSyncSleepNoteEnabled: false,
+    lastSyncStartDate: undefined,
+    lastSyncEndDate: undefined,
 
     // Google Fit defaults
     enableGoogleFit: false,
