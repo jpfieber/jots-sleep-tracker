@@ -1,5 +1,6 @@
 import { request, Notice } from 'obsidian';
 import type { Settings } from '../types';
+import { OAuthCallbackServer } from './oauth-server';
 
 interface GoogleFitAuthConfig {
     clientId: string;
@@ -53,11 +54,14 @@ const SCOPES = [
 export class GoogleFitService {
     private lastRequestTime = 0;
     private readonly minRequestInterval = 1000; // 1 second between requests
+    private oauthServer: OAuthCallbackServer;
 
     constructor(
         private settings: Settings,
         private config: GoogleFitServiceConfig
-    ) { }
+    ) {
+        this.oauthServer = new OAuthCallbackServer();
+    }
 
     private async rateLimit() {
         const now = Date.now();
@@ -85,19 +89,30 @@ export class GoogleFitService {
         });
 
         const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+
+        // Start the OAuth server before opening the URL
+        await this.oauthServer.start();
+
+        // Open the auth URL and wait for callback
         window.open(authUrl);
 
-        new Notice(
-            'Google Fit Authentication:\n\n' +
-            '1. Complete authorization in your browser\n' +
-            '2. After authorizing, you will be redirected\n' +
-            '3. Copy both the "code" and "state" parameters\n' +
-            '4. Use Command Palette and run "Complete Google Fit Authentication"\n' +
-            '5. Paste the code and state in the dialog',
-            20000
-        );
+        try {
+            // Wait for the callback to be processed
+            const { code, state: returnedState } = await this.oauthServer.waitForCallback();
 
-        return true;
+            if (!code || !returnedState) {
+                throw new Error('Authentication failed - no code or state received');
+            }
+
+            // Complete authentication with received code
+            return await this.completeAuthentication(code, returnedState);
+        } catch (error) {
+            console.error('Authentication failed:', error);
+            new Notice('Authentication failed. Please try again.');
+            return false;
+        } finally {
+            await this.oauthServer.close();
+        }
     }
 
     async completeAuthentication(code: string, state: string): Promise<boolean> {
@@ -126,6 +141,9 @@ export class GoogleFitService {
             this.settings.googleRefreshToken = tokens.refresh_token;
             this.settings.googleTokenExpiry = Date.now() + (tokens.expires_in * 1000);
             await this.config.onSettingsChange(this.settings);
+
+            // Refresh the settings tab if it's open
+            this.app.setting?.openTabById('jots-sleep-tracker');
 
             return true;
         } catch (error) {

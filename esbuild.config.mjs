@@ -35,6 +35,10 @@ const buildOptions = {
     sourcemap: prod ? false : 'inline',
     treeShaking: true,
     outfile: 'dist/main.js',
+    platform: 'browser',
+    define: {
+        'process.env.NODE_ENV': JSON.stringify(prod ? 'production' : 'development'),
+    }
 };
 
 if (process.argv[2] === '--watch') {
