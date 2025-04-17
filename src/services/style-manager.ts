@@ -1,10 +1,12 @@
-import type { Settings } from '../types';
+import { Settings } from '../types';
+import { SVG_ICON } from '../constants';
 
 export class StyleManager {
     private styleEl: HTMLStyleElement;
 
     constructor() {
-        this.styleEl = document.head.createEl('style');
+        this.styleEl = document.createElement('style');
+        document.head.appendChild(this.styleEl);
         this.styleEl.id = 'sleep-tracker-dynamic-styles';
     }
 
@@ -24,7 +26,7 @@ export class StyleManager {
                 -webkit-mask-position: 50% 50%;
                 color: var(--text-muted);
                 margin-left: -18px;
-                -webkit-mask-image: url("${settings.taskSvgIcon}");
+                -webkit-mask-image: url("${SVG_ICON}");
             }
 
             /* Style the measurement task items */

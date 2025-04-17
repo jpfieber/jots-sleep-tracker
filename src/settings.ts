@@ -17,8 +17,6 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
         containerEl.empty();
 
         // Google Fit Integration Settings
-        containerEl.createEl('h3', { text: 'Google Fit Integration' });
-
         new Setting(containerEl)
             .setName('Enable Google Fit Integration')
             .setDesc('Sync sleep data from your Google Fit account')
@@ -93,10 +91,12 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                         this.plugin.setupGoogleFitSync();
                     }));
 
-            // Add date range sync section
-            containerEl.createEl('h4', { text: 'Sync Sleep Data' });
+            // Manual sync section now as a subsection
+            const manualSyncHeader = containerEl.createEl('div', { cls: 'settings-indent' });
+            manualSyncHeader.createEl('h4', { text: 'Manual Data Sync' });
+            manualSyncHeader.createEl('p', { text: 'Useful for retrieving old data when you first start using the plugin, or grabbing data you missed if you haven\'t used Obsidian in over a week.' });
 
-            const syncDiv = containerEl.createDiv('sync-controls');
+            const syncDiv = manualSyncHeader.createDiv('sync-controls');
             syncDiv.style.padding = '10px';
             syncDiv.style.marginBottom = '20px';
 
@@ -261,7 +261,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                         cancelButton.style.display = 'none';
                     }, 3000);
                 } catch (error) {
-                    if (error.message === 'Sync cancelled') {
+                    if (error instanceof Error && error.message === 'Sync cancelled') {
                         progressText.setText('Sync cancelled');
                     } else {
                         progressText.setText('Sync failed. Check console for details.');
@@ -304,11 +304,9 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
         }
 
         // Journal Entry Settings
-        containerEl.createEl('h3', { text: 'Journal Entries' });
-
         new Setting(containerEl)
             .setName('Enable Journal Entries')
-            .setDesc('Add measurements to your daily journal')
+            .setDesc('Add sleep data to your daily journal')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.enableJournalEntry)
                 .onChange(async (value) => {
@@ -320,7 +318,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
         if (this.plugin.settings.enableJournalEntry) {
             new Setting(containerEl)
                 .setName('Journal Folder')
-                .setDesc('Folder where your daily journal entries are stored')
+                .setDesc('Root folder where your daily journal entries are stored')
                 .setClass('settings-indent')
                 .addSearch((cb) => {
                     new FolderSuggest(this.app, cb.inputEl);
@@ -346,10 +344,10 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
 
             new Setting(containerEl)
                 .setName('Journal Name Format')
-                .setDesc('Format for journal filenames (e.g. YYYY-MM-DD_DDD for 2025-04-13_Sun)')
+                .setDesc('Format for journal filenames (e.g. YYYY-MM-DD_ddd for 2025-04-13_Sun)')
                 .setClass('settings-indent')
                 .addText(text => text
-                    .setPlaceholder('YYYY-MM-DD_DDD')
+                    .setPlaceholder('YYYY-MM-DD_ddd')
                     .setValue(this.plugin.settings.journalNameFormat)
                     .onChange(async (value) => {
                         this.plugin.settings.journalNameFormat = value;
@@ -371,11 +369,11 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                 });
 
             new Setting(containerEl)
-                .setName('Asleep Entry Template')
-                .setDesc('Template for the asleep time part of the entry. Use <time> as placeholder for the time.')
+                .setName('Asleep Entry Format')
+                .setDesc('Format for the asleep time part of the entry. Use <time> (eg. 2:00PM) or <mtime> (eg. 14:00) as placeholder for the time.')
                 .setClass('settings-indent')
                 .addText(text => text
-                    .setPlaceholder('(asleep:: <time>)')
+                    .setPlaceholder('(time:: <mtime>) (type:: 💤) Asleep')
                     .setValue(this.plugin.settings.asleepEntryTemplate)
                     .onChange(async (value) => {
                         this.plugin.settings.asleepEntryTemplate = value;
@@ -383,11 +381,11 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                     }));
 
             new Setting(containerEl)
-                .setName('Awake Entry Template')
-                .setDesc('Template for the wake time and duration part. Use <time> for wake time and <duration> for duration.')
+                .setName('Awake Entry Format')
+                .setDesc('Format for the wake time and duration entry. Use <time> (eg. 2:00PM) or <mtime> (eg. 14:00) for wake time and <duration> for duration.')
                 .setClass('settings-indent')
                 .addText(text => text
-                    .setPlaceholder('(awake:: <time>) = (duration:: <duration>h)')
+                    .setPlaceholder('(time:: <mtime>) (type::⏰) Awake ((duration:: <duration>) hours of sleep)')
                     .setValue(this.plugin.settings.awakeEntryTemplate)
                     .onChange(async (value) => {
                         this.plugin.settings.awakeEntryTemplate = value;
@@ -396,10 +394,10 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
 
             new Setting(containerEl)
                 .setName('Task SVG Icon')
-                .setDesc('Data URI for the SVG icon to use for sleep entries (must be a valid data:image/svg+xml;base64 URI)')
+                .setDesc('Data URI for the SVG icon to use for sleep entries')
                 .setClass('settings-indent')
                 .addText(text => text
-                    .setPlaceholder('data:image/svg+xml;base64,...')
+                    .setPlaceholder("${SVG_ICON")
                     .setValue(this.plugin.settings.taskSvgIcon)
                     .onChange(async (value) => {
                         this.plugin.settings.taskSvgIcon = value;
@@ -420,8 +418,6 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
         }
 
         // Sleep Note Settings
-        containerEl.createEl('h3', { text: 'Sleep Note' });
-
         new Setting(containerEl)
             .setName('Enable Sleep Note')
             .setDesc('Add sleep entries to a dedicated sleep tracking note')
@@ -449,8 +445,8 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                 });
 
             new Setting(containerEl)
-                .setName('Sleep Note Entry Template')
-                .setDesc('Template for sleep entries. Use <date>, <time>, <type>, and <duration> as placeholders')
+                .setName('Sleep Note Entry Format')
+                .setDesc('Template for sleep entries. Use <date>, <time>, <mtime>, <type>, and <duration> as placeholders')
                 .setClass('settings-indent')
                 .addText(text => text
                     .setPlaceholder('| <date> | <time> | <type> | <duration> |')
@@ -460,5 +456,50 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                         await this.plugin.saveSettings();
                     }));
         }
+
+        // Add website and coffee sections at the end
+        this.addWebsiteSection(containerEl);
+        this.addCoffeeSection(containerEl);
+    }
+
+    private addWebsiteSection(containerEl: HTMLElement) {
+        const websiteDiv = containerEl.createEl('div', { cls: 'website-section' });
+
+        const logoLink = websiteDiv.createEl('a', { href: 'https://jots.life' });
+        logoLink.setAttribute('target', '_blank');
+
+        logoLink.createEl('img', {
+            attr: {
+                src: 'https://jots.life/jots-logo-512/',
+                alt: 'JOTS Logo',
+            },
+        });
+
+        const descriptionDiv = websiteDiv.createEl('div', { cls: 'website-description' });
+
+        descriptionDiv.appendText('While this plugin works on its own, it is part of a system called ');
+        const jotsLink = descriptionDiv.createEl('a', {
+            text: 'JOTS',
+            href: 'https://jots.life'
+        });
+        jotsLink.setAttribute('target', '_blank');
+        descriptionDiv.appendText(' that helps capture, organize, and visualize your life\'s details.');
+    }
+
+    private addCoffeeSection(containerEl: HTMLElement) {
+        const coffeeDiv = containerEl.createEl('div', { cls: 'buy-me-a-coffee' });
+
+        const coffeeLink = coffeeDiv.createEl('a', {
+            href: 'https://www.buymeacoffee.com/jpfieber'
+        });
+        coffeeLink.setAttribute('target', '_blank');
+
+        coffeeLink.createEl('img', {
+            attr: {
+                src: 'https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png',
+                alt: 'Buy Me A Coffee'
+            },
+            cls: 'bmc-button'
+        });
     }
 }

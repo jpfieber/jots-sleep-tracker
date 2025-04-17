@@ -140,3 +140,21 @@
 .markdown-preview-view ul>li.task-list-item input.task-list-item-checkbox {
     display: none !important;
 }
+
+/* Website Description: Styles for the text description in the website section */
+.website-description {
+    font-size: 14px;
+    line-height: 1.5;
+    color: #555;
+}
+
+/* Buy Me a Coffee Section: Styles for the donation section */
+.buy-me-a-coffee {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.buy-me-a-coffee img {
+    height: 60px;
+    width: 217px;
+}
