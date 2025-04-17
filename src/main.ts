@@ -286,59 +286,5 @@ export default class SleepTrackerPlugin extends Plugin {
                 return canRun;
             }
         });
-
-        this.addCommand({
-            id: 'complete-google-fit-auth',
-            name: 'Complete Google Fit Authentication',
-            callback: () => {
-                const modal = new Modal(this.app);
-                modal.titleEl.setText('Complete Google Fit Authentication');
-
-                const contentEl = modal.contentEl;
-                contentEl.empty();
-
-                const codeInput = contentEl.createEl('input', {
-                    attr: {
-                        type: 'text',
-                        placeholder: 'Enter the code from the redirect URL'
-                    }
-                });
-
-                const stateInput = contentEl.createEl('input', {
-                    attr: {
-                        type: 'text',
-                        placeholder: 'Enter the state from the redirect URL'
-                    }
-                });
-
-                const buttonDiv = contentEl.createDiv();
-                buttonDiv.style.marginTop = '1em';
-
-                const submitButton = buttonDiv.createEl('button', {
-                    text: 'Submit'
-                });
-
-                submitButton.onclick = async () => {
-                    const code = codeInput.value;
-                    const state = stateInput.value;
-
-                    if (!code || !state) {
-                        new Notice('Please enter both code and state values');
-                        return;
-                    }
-
-                    try {
-                        await this.googleFitService?.completeAuthentication(code, state);
-                        modal.close();
-                        new Notice('Successfully connected to Google Fit!');
-                    } catch (error) {
-                        console.error('Failed to complete authentication:', error);
-                        new Notice('Failed to complete authentication. Check the console for details.');
-                    }
-                };
-
-                modal.open();
-            }
-        });
     }
 }

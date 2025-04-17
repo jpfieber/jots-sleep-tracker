@@ -33,11 +33,6 @@
       "icon": "refresh-cw"
     },
     {
-      "id": "complete-google-fit-auth",
-      "name": "Complete Google Fit Authentication",
-      "icon": "check"
-    },
-    {
       "id": "add-sleep",
       "name": "Add Sleep Record Manually",
       "icon": "plus"
