@@ -42,6 +42,7 @@ interface GoogleFitSleepMeasurement {
 
 interface GoogleFitServiceConfig extends GoogleFitAuthConfig {
     onSettingsChange: (settings: Settings) => Promise<void>;
+    app: any; // Obsidian App instance
 }
 
 const SCOPES = [
@@ -60,7 +61,7 @@ export class GoogleFitService {
         private settings: Settings,
         private config: GoogleFitServiceConfig
     ) {
-        this.oauthServer = new OAuthCallbackServer();
+        this.oauthServer = new OAuthCallbackServer(config.app);
     }
 
     private async rateLimit() {
@@ -140,10 +141,15 @@ export class GoogleFitService {
             this.settings.googleAccessToken = tokens.access_token;
             this.settings.googleRefreshToken = tokens.refresh_token;
             this.settings.googleTokenExpiry = Date.now() + (tokens.expires_in * 1000);
+
+            // Save settings and immediately force refresh any open settings tabs
             await this.config.onSettingsChange(this.settings);
 
-            // Refresh the settings tab if it's open
-            this.app.setting?.openTabById('jots-sleep-tracker');
+            // Force an immediate refresh of any open settings tabs
+            const settingTab = (this.config.app as any).setting?.activeTab;
+            if (settingTab?.id === 'jots-sleep-tracker') {
+                setTimeout(() => settingTab.display(), 0);
+            }
 
             return true;
         } catch (error) {

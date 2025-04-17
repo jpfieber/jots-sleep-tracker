@@ -283,7 +283,7 @@ export class JournalService {
         return lines.some(line => line.includes(searchEntry));
     }
 
-    private async appendToSleepNote(data: MeasurementRecord): Promise<void> {
+    public async appendToSleepNote(data: MeasurementRecord): Promise<void> {
         try {
             if (!this.settings.sleepNotePath) {
                 throw new Error('Sleep note path not configured');

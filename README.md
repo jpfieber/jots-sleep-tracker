@@ -11,7 +11,7 @@ The Obsidian Sleep Tracker plugin allows users to track their sleep patterns eff
 
 ## Installation
 1. Download the plugin files
-2. Place the `obsidian-sleep-tracker` folder in your Obsidian plugins directory
+2. Place the `jots-sleep-tracker` folder in your Obsidian plugins directory
 3. Enable the plugin in the Obsidian settings
 
 ## Usage

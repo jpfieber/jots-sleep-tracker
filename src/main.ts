@@ -57,8 +57,11 @@ export default class SleepTrackerPlugin extends Plugin {
 
     async saveSettings() {
         await this.saveData(this.settings);
-        // Update styles whenever settings are saved
-        this.styleManager.updateStyles(this.settings);
+        // Update any open settings tabs
+        const settingTab = (this.app as any).setting?.activeTab;
+        if (settingTab?.id === 'jots-sleep-tracker') {
+            settingTab.display();
+        }
     }
 
     getUnitForMeasurement(type: MeasurementType): { metric: string, imperial: string } {
@@ -85,13 +88,21 @@ export default class SleepTrackerPlugin extends Plugin {
                 clientSecret: this.settings.googleClientSecret,
                 redirectUri: 'http://localhost:16321/callback',
                 scope: [
-                    'https://www.googleapis.com/auth/fitness.body.read',
-                    'https://www.googleapis.com/auth/fitness.body.write'
+                    'https://www.googleapis.com/auth/fitness.sleep.read',
+                    'https://www.googleapis.com/auth/fitness.sleep.write'
                 ],
                 onSettingsChange: async (settings) => {
+                    // Update our settings
                     this.settings = settings;
-                    await this.saveSettings();
-                }
+                    // Save the settings to disk
+                    await this.saveData(this.settings);
+                    // Force refresh the UI
+                    const settingTab = (this.app as any).setting?.activeTab;
+                    if (settingTab?.id === 'jots-sleep-tracker') {
+                        settingTab.display();
+                    }
+                },
+                app: this.app
             });
             this.setupGoogleFitSync();
         } else {
@@ -202,7 +213,7 @@ export default class SleepTrackerPlugin extends Plugin {
             new Notice(`Successfully synced sleep data ${dateRangeStr}`);
         } catch (error) {
             console.error('Failed to sync with Google Fit:', error);
-            if (error.message !== 'Sync cancelled') {
+            if (error instanceof Error && error.message !== 'Sync cancelled') {
                 new Notice('Failed to sync with Google Fit. Check the console for details.');
             }
             throw error;
