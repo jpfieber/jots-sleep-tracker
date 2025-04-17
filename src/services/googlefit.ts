@@ -9,12 +9,6 @@ interface GoogleFitAuthConfig {
     scope: string[];
 }
 
-interface GoogleFitMeasurement {
-    date: number;
-    weight?: number;
-    bodyFat?: number;
-}
-
 interface GoogleFitSleepSession {
     activityType: number;
     startTimeMillis: number;
@@ -46,8 +40,6 @@ interface GoogleFitServiceConfig extends GoogleFitAuthConfig {
 }
 
 const SCOPES = [
-    'https://www.googleapis.com/auth/fitness.body.read',
-    'https://www.googleapis.com/auth/fitness.body.write',
     'https://www.googleapis.com/auth/fitness.sleep.read',
     'https://www.googleapis.com/auth/fitness.sleep.write'
 ];
@@ -192,148 +184,6 @@ export class GoogleFitService {
                 console.error('Failed to refresh token:', error);
                 throw error;
             }
-        }
-    }
-
-    async getMeasurements(startTime: number, endTime: number): Promise<GoogleFitMeasurement[]> {
-        await this.rateLimit();
-        await this.refreshTokenIfNeeded();
-
-        try {
-            // Convert Unix timestamps to nanoseconds
-            const startTimeNs = startTime * 1000000000;
-            const endTimeNs = endTime * 1000000000;
-
-            console.log('Querying Google Fit for time range:', {
-                start: new Date(startTime * 1000).toISOString(),
-                end: new Date(endTime * 1000).toISOString(),
-                startTimeNs,
-                endTimeNs
-            });
-
-            // Get weight data
-            const weightResponse = await request({
-                url: `https://www.googleapis.com/fitness/v1/users/me/dataSources/derived:com.google.weight:com.google.android.gms:merged/datasets/${startTimeNs}-${endTimeNs}`,
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${this.settings.googleAccessToken}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            const weightData = JSON.parse(weightResponse);
-            console.log('Google Fit weight response:', weightData);
-
-            const measurements: GoogleFitMeasurement[] = [];
-
-            // Process weight data
-            if (weightData.point) {
-                for (const point of weightData.point) {
-                    const timestamp = Math.floor(parseInt(point.startTimeNanos) / 1000000000);
-                    measurements.push({
-                        date: timestamp,
-                        weight: point.value[0].fpVal
-                    });
-                }
-            }
-
-            // Get body fat data
-            const bodyFatResponse = await request({
-                url: `https://www.googleapis.com/fitness/v1/users/me/dataSources/derived:com.google.body.fat.percentage:com.google.android.gms:merged/datasets/${startTimeNs}-${endTimeNs}`,
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${this.settings.googleAccessToken}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            const bodyFatData = JSON.parse(bodyFatResponse);
-            console.log('Google Fit body fat response:', bodyFatData);
-
-            // Process body fat data
-            if (bodyFatData.point) {
-                for (const point of bodyFatData.point) {
-                    const timestamp = Math.floor(parseInt(point.startTimeNanos) / 1000000000);
-                    const measurement = measurements.find(m => m.date === timestamp);
-
-                    if (measurement) {
-                        measurement.bodyFat = point.value[0].fpVal;
-                    } else {
-                        measurements.push({
-                            date: timestamp,
-                            bodyFat: point.value[0].fpVal
-                        });
-                    }
-                }
-            }
-
-            console.log('Processed Google Fit measurements:', measurements);
-            return measurements;
-        } catch (error) {
-            console.error('Failed to fetch Google Fit measurements:', error);
-            throw error;
-        }
-    }
-
-    async addMeasurement(date: number, weight: number, bodyFat?: number): Promise<void> {
-        await this.rateLimit();
-        await this.refreshTokenIfNeeded();
-
-        const nanos = `${date}000000000`;
-
-        try {
-            // Add weight measurement
-            const weightResponse = await request({
-                url: `https://www.googleapis.com/fitness/v1/users/me/dataSources/derived:com.google.weight:com.google.android.gms:merge_weight/datasets/${nanos}-${nanos}`,
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${this.settings.googleAccessToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    dataSourceId: 'derived:com.google.weight:com.google.android.gms:merge_weight',
-                    point: [{
-                        startTimeNanos: nanos,
-                        endTimeNanos: nanos,
-                        dataTypeName: 'com.google.weight',
-                        value: [{
-                            fpVal: weight
-                        }]
-                    }]
-                })
-            });
-
-            const weightData = JSON.parse(weightResponse);
-            console.log('Google Fit weight update response:', weightData);
-
-            // Add body fat measurement if provided
-            if (bodyFat !== undefined) {
-                const bodyFatResponse = await request({
-                    url: `https://www.googleapis.com/fitness/v1/users/me/dataSources/derived:com.google.body.fat.percentage:com.google.android.gms:merge_body_fat_percentage/datasets/${nanos}-${nanos}`,
-                    method: 'PATCH',
-                    headers: {
-                        'Authorization': `Bearer ${this.settings.googleAccessToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        dataSourceId: 'derived:com.google.body.fat.percentage:com.google.android.gms:merge_body_fat_percentage',
-                        point: [{
-                            startTimeNanos: nanos,
-                            endTimeNanos: nanos,
-                            dataTypeName: 'com.google.body.fat.percentage',
-                            value: [{
-                                fpVal: bodyFat
-                            }]
-                        }]
-                    })
-                });
-
-                const bodyFatData = JSON.parse(bodyFatResponse);
-                console.log('Google Fit body fat update response:', bodyFatData);
-            }
-        } catch (error) {
-            console.error('Failed to add Google Fit measurement:', error);
-            throw error;
         }
     }
 
