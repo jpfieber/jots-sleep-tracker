@@ -53,6 +53,8 @@ export class MeasurementModal extends Modal {
                 const moment = (window as any).moment;
                 const now = moment().format('HH:mm');
                 text.setValue(now);
+                // Set initial value in component state
+                this.values.currentTime = now;
                 text.onChange((value) => {
                     this.values.currentTime = value;
                 });
@@ -67,6 +69,11 @@ export class MeasurementModal extends Modal {
                     .addOption('asleep', 'Asleep')
                     .addOption('awake', 'Awake')
                     .setValue('asleep');
+                // Set initial state
+                if (this.values.currentTime) {
+                    this.values.asleepTime = this.values.currentTime;
+                    this.values.awakeTime = undefined;
+                }
                 dropdown.onChange(value => {
                     if (this.values.currentTime) {
                         if (value === 'asleep') {
@@ -118,52 +125,57 @@ export class MeasurementModal extends Modal {
             .addButton(btn => btn
                 .setButtonText('Submit')
                 .setCta()
-                .onClick(() => {
+                .onClick(async () => {
                     const dateStr = (dateTimeContainer.querySelector('input[type="date"]') as HTMLInputElement).value;
                     const timeStr = this.values.currentTime;
                     const stateSelect = contentEl.querySelector('.dropdown') as HTMLSelectElement;
 
-                    if (!timeStr) {
+                    // Validate all required fields
+                    if (!dateStr || !timeStr || !stateSelect?.value) {
+                        new Notice('Please fill in all required fields');
                         return;
                     }
 
-                    console.log('Modal submit - Date:', dateStr, 'Time:', timeStr, 'State:', stateSelect.value);
-                    console.log('Current settings:', this.settings);
-
-                    const measurementData: MeasurementRecord = {
-                        date: `${dateStr} ${timeStr}`,
-                        userId: this.settings.defaultUser || this.settings.users[0]?.id || '',
-                    };
-
-                    if (stateSelect.value === 'asleep') {
-                        measurementData.asleepTime = timeStr;
-                    } else {
-                        measurementData.awakeTime = timeStr;
-                        // Calculate duration if we have both times
-                        if (this.values.asleepTime) {
-                            const asleepMoment = (window as any).moment(`${dateStr} ${this.values.asleepTime}`, 'YYYY-MM-DD HH:mm');
-                            const awakeMoment = (window as any).moment(`${dateStr} ${timeStr}`, 'YYYY-MM-DD HH:mm');
-                            const duration = awakeMoment.diff(asleepMoment, 'hours', true);
-                            measurementData.sleepDuration = duration.toFixed(1);
-                        }
-                    }
-
-                    console.log('Sending measurement data:', measurementData);
-
-                    // Temporarily override settings based on user's choices
+                    // Store original settings before any changes
                     const originalJournalSetting = this.settings.enableJournalEntry;
                     const originalSleepNoteSetting = this.settings.enableSleepNote;
 
-                    this.settings.enableJournalEntry = this.settings.enableJournalEntry && this.values.addToJournal;
-                    this.settings.enableSleepNote = this.settings.enableSleepNote && this.values.addToSleepNote;
+                    try {
+                        const measurementData: MeasurementRecord = {
+                            date: `${dateStr} ${timeStr}`,
+                            userId: this.settings.defaultUser || this.settings.users[0]?.id || '',
+                        };
 
-                    this.plugin.saveMeasurement(measurementData);
+                        if (stateSelect.value === 'asleep') {
+                            measurementData.asleepTime = timeStr;
+                        } else {
+                            measurementData.awakeTime = timeStr;
+                            // Calculate duration if we have both times
+                            if (this.values.asleepTime) {
+                                const asleepMoment = (window as any).moment(`${dateStr} ${this.values.asleepTime}`, 'YYYY-MM-DD HH:mm');
+                                const awakeMoment = (window as any).moment(`${dateStr} ${timeStr}`, 'YYYY-MM-DD HH:mm');
+                                const duration = awakeMoment.diff(asleepMoment, 'hours', true);
+                                measurementData.sleepDuration = duration.toFixed(1);
+                            }
+                        }
 
-                    // Restore original settings
-                    this.settings.enableJournalEntry = originalJournalSetting;
-                    this.settings.enableSleepNote = originalSleepNoteSetting;
+                        console.log('Sending measurement data:', measurementData);
 
-                    this.close();
+                        // Temporarily override settings based on user's choices
+                        this.settings.enableJournalEntry = this.settings.enableJournalEntry && this.values.addToJournal;
+                        this.settings.enableSleepNote = this.settings.enableSleepNote && this.values.addToSleepNote;
+
+                        await this.plugin.saveMeasurement(measurementData);
+                        new Notice('Sleep record saved successfully');
+                        this.close();
+                    } catch (error) {
+                        console.error('Failed to save sleep record:', error);
+                        new Notice('Failed to save sleep record. Please try again.');
+                    } finally {
+                        // Restore original settings
+                        this.settings.enableJournalEntry = originalJournalSetting;
+                        this.settings.enableSleepNote = originalSleepNoteSetting;
+                    }
                 }));
     }
 
