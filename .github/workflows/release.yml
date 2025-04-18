@@ -29,6 +29,7 @@ jobs:
       - name: Copy files to root
         run: |
           cp dist/main.js .
+          cp src/styles/styles.css .
 
       - name: Create release
         env:
