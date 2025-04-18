@@ -52,6 +52,12 @@ export class JournalService {
         let file = this.app.vault.getAbstractFileByPath(journalPath);
         let journalContent = '';
 
+        // Add class name to the task list items
+        const enhancedContent = content.replace(
+            /^- \[([^\]]+)\]/gm,
+            '- [$1]{.jots-sleep-tracker-sleep-record-entry}'
+        );
+
         // If file doesn't exist, create it and ensure it's ready
         if (!(file instanceof TFile)) {
             try {
@@ -94,11 +100,11 @@ export class JournalService {
         }
 
         // Simple check - if the exact string already exists, don't add it again
-        if (!journalContent.includes(content.trim())) {
+        if (!journalContent.includes(enhancedContent.trim())) {
             // Append the new entry to the file
             const newContent = journalContent.trim() === ''
-                ? content
-                : journalContent.trim() + '\n' + content;
+                ? enhancedContent
+                : journalContent.trim() + '\n' + enhancedContent;
 
             // Update the file with retry
             if (file instanceof TFile) {

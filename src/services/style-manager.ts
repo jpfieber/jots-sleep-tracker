@@ -1,10 +1,13 @@
 import { Settings } from '../types';
 import { SVG_ICON } from '../constants';
+import { svgToDataUri, isEmoji } from '../utils';
 
 export class StyleManager {
     private styleEl: HTMLStyleElement;
     private lastStyles: string = '';
     private pendingUpdate: number | null = null;
+    private customIcon: string | null = null;
+    private isEmojiIcon: boolean = false;
 
     constructor() {
         this.styleEl = document.createElement('style');
@@ -12,11 +15,89 @@ export class StyleManager {
         this.styleEl.id = 'jots-sleep-tracker-dynamic-styles';
     }
 
+    setCustomIcon(iconData: string) {
+        // Handle empty or invalid input
+        if (!iconData || iconData.trim() === '') {
+            console.log('StyleManager: No icon data provided');
+            this.isEmojiIcon = false;
+            this.customIcon = null;
+            return;
+        }
+
+        const trimmedData = iconData.trim();
+        // If 1-2 characters, treat as emoji
+        if (isEmoji(trimmedData)) {
+            console.log('StyleManager: Detected emoji icon:', trimmedData);
+            this.isEmojiIcon = true;
+            this.customIcon = trimmedData;
+        } else {
+            // Otherwise treat as SVG
+            console.log('StyleManager: Processing SVG icon data:', trimmedData.substring(0, 50) + '...');
+            this.isEmojiIcon = false;
+            this.customIcon = svgToDataUri(trimmedData);
+        }
+    }
+
+    generateStyles(settings: Settings): string {
+        // If no icon is set, don't apply any styles - let Obsidian's defaults take over
+        if (!this.customIcon) {
+            return '';
+        }
+
+        // Base styles for custom icon
+        const baseStyles = `
+            .HyperMD-task-line[data-task="${settings.stringPrefixLetter}"] {
+                position: relative;
+            }
+
+            .HyperMD-task-line[data-task="${settings.stringPrefixLetter}"] .task-list-item-checkbox {
+                visibility: hidden;
+                position: relative;
+                margin: 0;
+            }
+
+            .HyperMD-task-line[data-task="${settings.stringPrefixLetter}"] .task-list-item-checkbox::before {
+                content: "";
+                position: absolute;
+                left: 0;
+                top: 50%;
+                transform: translateY(-50%);
+                width: 16px;
+                height: 16px;
+                display: block;
+            }`;
+
+        // Icon-specific styles
+        const iconStyles = this.isEmojiIcon
+            ? `.HyperMD-task-line[data-task="${settings.stringPrefixLetter}"] .task-list-item-checkbox::before {
+                content: "${this.customIcon}";
+                font-family: "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+                font-size: 14px;
+                line-height: 1;
+                text-align: center;
+                visibility: visible;
+            }`
+            : `.HyperMD-task-line[data-task="${settings.stringPrefixLetter}"] .task-list-item-checkbox::before {
+                -webkit-mask-image: url('${this.customIcon}');
+                mask-image: url('${this.customIcon}');
+                -webkit-mask-size: contain;
+                mask-size: contain;
+                -webkit-mask-repeat: no-repeat;
+                mask-repeat: no-repeat;
+                -webkit-mask-position: center;
+                mask-position: center;
+                background-color: currentColor;
+                visibility: visible;
+            }`;
+
+        return `${baseStyles}\n${iconStyles}`;
+    }
+
     updateStyles(settings: Settings) {
-        const dynamicStyles = this.generateStyles(settings);
+        const styles = this.generateStyles(settings);
 
         // Skip update if styles haven't changed
-        if (this.lastStyles === dynamicStyles) {
+        if (this.lastStyles === styles) {
             return;
         }
 
@@ -27,90 +108,14 @@ export class StyleManager {
 
         // Schedule update for next frame
         this.pendingUpdate = window.requestAnimationFrame(() => {
-            this.applyStyles(dynamicStyles);
+            this.applyStyles(styles);
             this.pendingUpdate = null;
         });
     }
 
-    private generateStyles(settings: Settings): string {
-        return `
-            /* Target all checkbox inputs with our prefix */
-            input[data-task="${settings.stringPrefixLetter}"]:checked,
-            li[data-task="${settings.stringPrefixLetter}"]>input:checked,
-            li[data-task="${settings.stringPrefixLetter}"]>p>input:checked {
-                --checkbox-marker-color: transparent;
-                border: none;
-                border-radius: 0;
-                background-image: none;
-                background-color: currentColor;
-                pointer-events: none;
-                -webkit-mask-size: var(--checkbox-icon);
-                -webkit-mask-position: 50% 50%;
-                color: var(--text-muted);
-                margin-left: -18px;
-                -webkit-mask-image: url("${SVG_ICON}");
-            }
-
-            /* Style the sleep record task items */
-            .jots-sleep-tracker-sleep-record-entry[data-task="${settings.stringPrefixLetter}"] {
-                position: relative;
-                padding-left: 24px;
-            }
-
-            /* Style dataview inline fields within sleep record entries */
-            .jots-sleep-tracker-sleep-record-entry[data-task="${settings.stringPrefixLetter}"] .dataview.inline-field {
-                display: inline-flex;
-                align-items: center;
-                gap: 4px;
-            }
-
-            /* Style the inline field keys */
-            .jots-sleep-tracker-sleep-record-entry[data-task="${settings.stringPrefixLetter}"] .dataview.inline-field-key {
-                color: var(--text-muted);
-                font-size: 0.9em;
-                opacity: 0.8;
-            }
-
-            /* Style the inline field values */
-            .jots-sleep-tracker-sleep-record-entry[data-task="${settings.stringPrefixLetter}"] .dataview.inline-field-value {
-                color: var(--text-normal);
-                font-weight: 500;
-            }
-
-            /* Style the separator between key and value */
-            .jots-sleep-tracker-sleep-record-entry[data-task="${settings.stringPrefixLetter}"] .dataview.inline-field-key::after {
-                content: ":";
-                margin-right: 4px;
-                color: var(--text-muted);
-                opacity: 0.8;
-            }
-
-            /* Style the dataview inline fields */
-            body .jots-sleep-tracker-sleep-record-entry[data-task="${settings.stringPrefixLetter}"]>.dataview.inline-field>.dataview.inline-field-key::after {
-                content: "=";
-                color: black;
-            }
-        `;
-    }
-
     private applyStyles(styles: string) {
-        try {
-            if ('replaceSync' in CSSStyleSheet.prototype) {
-                // Use the modern CSSStyleSheet API if available
-                const sheet = new CSSStyleSheet();
-                sheet.replaceSync(styles);
-                this.styleEl.textContent = ''; // Clear existing styles
-                (this.styleEl as any).sheet = sheet;
-            } else {
-                // Fall back to textContent for older browsers
-                this.styleEl.textContent = styles;
-            }
-            this.lastStyles = styles;
-        } catch (error) {
-            // Fall back to textContent if CSSStyleSheet API fails
-            this.styleEl.textContent = styles;
-            this.lastStyles = styles;
-        }
+        this.styleEl.textContent = styles;
+        this.lastStyles = styles;
     }
 
     removeStyles() {

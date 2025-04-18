@@ -25,6 +25,8 @@ export default class SleepTrackerPlugin extends Plugin {
         this.measurementService = new MeasurementService(this.app, this.settings);
         this.journalService = new JournalService(this.app, this.settings);
         this.styleManager = new StyleManager();
+        // Set initial icon from settings
+        this.styleManager.setCustomIcon(this.settings.taskSvgIcon);
         this.styleManager.updateStyles(this.settings);
 
         // Setup Google Fit if enabled
@@ -76,8 +78,10 @@ export default class SleepTrackerPlugin extends Plugin {
 
     async saveSettings() {
         await this.saveData(this.settings);
-        // Update services with new settings
+        // Update style manager with new icon and styles
+        this.styleManager.setCustomIcon(this.settings.taskSvgIcon);
         this.styleManager.updateStyles(this.settings);
+        // Update services with new settings
         this.journalService = new JournalService(this.app, this.settings);
 
         // Update Google Fit service if needed

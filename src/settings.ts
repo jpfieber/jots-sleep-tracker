@@ -2,6 +2,7 @@ import { App, PluginSettingTab, Setting, setIcon, SearchComponent, Notice } from
 import { Settings, User, Measurement, MeasurementUnit, MeasurementType } from './types';
 import { FolderSuggest } from './foldersuggester';
 import { FileSuggest } from './filesuggester';
+import { svgToDataUri } from './utils';
 import SleepTrackerPlugin from './main';
 
 export class SleepTrackerSettingsTab extends PluginSettingTab {
@@ -408,10 +409,10 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
 
             new Setting(containerEl)
                 .setName('Task SVG Icon')
-                .setDesc('Data URI for the SVG icon to use for sleep entries')
+                .setDesc('Enter either a single emoji (e.g. 💤) or raw SVG markup for the icon to use for sleep entries.')
                 .setClass('jots-sleep-tracker-settings-indent')
-                .addText(text => text
-                    .setPlaceholder("${SVG_ICON")
+                .addTextArea(text => text
+                    .setPlaceholder('💤 or <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="..."/></svg>')
                     .setValue(this.plugin.settings.taskSvgIcon)
                     .onChange(async (value) => {
                         this.plugin.settings.taskSvgIcon = value;
