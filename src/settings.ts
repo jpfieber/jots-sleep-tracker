@@ -7,7 +7,6 @@ import SleepTrackerPlugin from './main';
 
 export class SleepTrackerSettingsTab extends PluginSettingTab {
     plugin: SleepTrackerPlugin;
-    private boundHandlers: Array<{ element: HTMLElement, type: string, handler: EventListener }> = [];
 
     constructor(app: App, plugin: SleepTrackerPlugin) {
         super(app, plugin);
@@ -21,16 +20,18 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
 
     hide() {
         // Clean up event listeners when tab is hidden
-        this.boundHandlers.forEach(({ element, type, handler }) => {
-            element.removeEventListener(type, handler);
-        });
-        this.boundHandlers = [];
         super.hide();
     }
 
-    private addSafeEventListener(element: HTMLElement, type: string, handler: EventListener) {
-        element.addEventListener(type, handler);
-        this.boundHandlers.push({ element, type, handler });
+    private addSafeEventListener(element: HTMLElement, type: keyof HTMLElementEventMap, handler: (ev: Event) => void) {
+        if (this.plugin instanceof Plugin) {
+            this.plugin.registerDomEvent(element, type, (ev) => {
+                handler(ev);
+            });
+        } else {
+            // Fallback for non-plugin contexts
+            element.addEventListener(type, handler);
+        }
     }
 
     display(): void {

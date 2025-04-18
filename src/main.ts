@@ -73,6 +73,11 @@ export default class SleepTrackerPlugin extends Plugin {
         if (this.googleFitSyncInterval) {
             window.clearInterval(this.googleFitSyncInterval);
         }
+
+        // Close OAuth server if it exists
+        if (this.googleFitService?.oauthServer) {
+            this.googleFitService.oauthServer.close();
+        }
     }
 
     async loadSettings() {

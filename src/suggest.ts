@@ -9,9 +9,9 @@ const wrapAround = (value: number, size: number): number => {
 
 class Suggest<T> {
     private owner: ISuggestOwner<T>;
-    private values: T[];
-    private suggestions: HTMLDivElement[];
-    private selectedItem: number;
+    private values: T[] = [];
+    private suggestions: HTMLDivElement[] = [];
+    private selectedItem: number = 0;
     private containerEl: HTMLElement;
 
     constructor(
@@ -25,12 +25,21 @@ class Suggest<T> {
         containerEl.on(
             "click",
             ".suggestion-item",
-            this.onSuggestionClick.bind(this)
+            (event: MouseEvent, target: HTMLElement) => {
+                event.preventDefault();
+                const item = this.suggestions.indexOf(target as HTMLDivElement);
+                this.setSelectedItem(item, false);
+                this.useSelectedItem(event);
+            }
         );
+
         containerEl.on(
             "mousemove",
             ".suggestion-item",
-            this.onSuggestionMouseover.bind(this)
+            (_event: MouseEvent, target: HTMLElement) => {
+                const item = this.suggestions.indexOf(target as HTMLDivElement);
+                this.setSelectedItem(item, false);
+            }
         );
 
         scope.register([], "ArrowUp", (event) => {
@@ -113,7 +122,7 @@ export abstract class TextInputSuggest<T> implements ISuggestOwner<T> {
     protected app: App;
     protected inputEl: HTMLInputElement | HTMLTextAreaElement;
 
-    private popper: PopperInstance;
+    private popper: PopperInstance | null = null;
     private scope: Scope;
     private suggestEl: HTMLElement;
     private suggest: Suggest<T>;
@@ -129,16 +138,13 @@ export abstract class TextInputSuggest<T> implements ISuggestOwner<T> {
 
         this.scope.register([], "Escape", this.close.bind(this));
 
+        // Simplified event handling
         this.inputEl.addEventListener("input", this.onInputChanged.bind(this));
         this.inputEl.addEventListener("focus", this.onInputChanged.bind(this));
         this.inputEl.addEventListener("blur", this.close.bind(this));
-        this.suggestEl.on(
-            "mousedown",
-            ".suggestion-container",
-            (event: MouseEvent) => {
-                event.preventDefault();
-            }
-        );
+        this.suggestEl.addEventListener("mousedown", (event: MouseEvent) => {
+            event.preventDefault();
+        });
     }
 
     onInputChanged(): void {
@@ -152,14 +158,16 @@ export abstract class TextInputSuggest<T> implements ISuggestOwner<T> {
 
         if (suggestions.length > 0) {
             this.suggest.setSuggestions(suggestions);
-            this.open(this.app.dom.appContainerEl, this.inputEl);
+            // Use document.body instead of app.dom.appContainerEl
+            this.open(document.body, this.inputEl);
         } else {
             this.close();
         }
     }
 
     open(container: HTMLElement, inputEl: HTMLElement): void {
-        this.app.keymap.pushScope(this.scope);
+        // Use standard scope management
+        this.scope.register([], "Escape", this.close.bind(this));
 
         container.appendChild(this.suggestEl);
         this.popper = createPopper(inputEl, this.suggestEl, {
@@ -169,10 +177,6 @@ export abstract class TextInputSuggest<T> implements ISuggestOwner<T> {
                     name: "sameWidth",
                     enabled: true,
                     fn: ({ state, instance }) => {
-                        // Note: positioning needs to be calculated twice -
-                        // first pass - positioning it according to the width of the popper
-                        // second pass - position it with the width bound to the reference element
-                        // we need to early exit to avoid an infinite loop
                         const targetWidth = `${state.rects.reference.width}px`;
                         if (state.styles.popper.width === targetWidth) {
                             return;
@@ -188,10 +192,14 @@ export abstract class TextInputSuggest<T> implements ISuggestOwner<T> {
     }
 
     close(): void {
-        this.app.keymap.popScope(this.scope);
-
+        // Clear scope without using unregister
+        this.scope = new Scope();
+        
         this.suggest.setSuggestions([]);
-        if (this.popper) this.popper.destroy();
+        if (this.popper) {
+            this.popper.destroy();
+            this.popper = null;
+        }
         this.suggestEl.detach();
     }
 

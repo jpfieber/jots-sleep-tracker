@@ -54,7 +54,7 @@ export class GoogleFitService {
     private app: App;
     private lastRequestTime = 0;
     private readonly minRequestInterval = 1000; // 1 second between requests
-    private oauthServer: OAuthCallbackServer;
+    readonly oauthServer: OAuthCallbackServer;
     private moment = (window as any).moment;
 
     constructor(settings: Settings, config: {
