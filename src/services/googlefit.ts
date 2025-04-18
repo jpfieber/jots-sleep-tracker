@@ -45,15 +45,34 @@ const SCOPES = [
 ];
 
 export class GoogleFitService {
+    private settings: Settings;
+    private clientId: string;
+    private clientSecret: string;
+    private redirectUri: string;
+    private scope: string[];
+    private onSettingsChange: (settings: Settings) => Promise<void>;
+    private app: App;
+    private server?: OAuthServer;
     private lastRequestTime = 0;
     private readonly minRequestInterval = 1000; // 1 second between requests
     private oauthServer: OAuthCallbackServer;
     private moment = (window as any).moment;
 
-    constructor(
-        private settings: Settings,
-        private config: GoogleFitServiceConfig
-    ) {
+    constructor(settings: Settings, config: {
+        clientId: string;
+        clientSecret: string;
+        redirectUri: string;
+        scope: string[];
+        onSettingsChange: (settings: Settings) => Promise<void>;
+        app: App;
+    }) {
+        this.settings = settings;
+        this.clientId = config.clientId;
+        this.clientSecret = config.clientSecret;
+        this.redirectUri = config.redirectUri;
+        this.scope = config.scope;
+        this.onSettingsChange = config.onSettingsChange;
+        this.app = config.app;
         this.oauthServer = new OAuthCallbackServer(config.app);
         if (!this.moment) {
             throw new Error('Moment.js is required');
@@ -74,11 +93,11 @@ export class GoogleFitService {
     async authenticate(): Promise<boolean> {
         const state = Math.random().toString(36).substring(7);
         this.settings.googleAuthState = state;
-        await this.config.onSettingsChange(this.settings);
+        await this.onSettingsChange(this.settings);
 
         const params = new URLSearchParams({
-            client_id: this.config.clientId,
-            redirect_uri: this.config.redirectUri,
+            client_id: this.clientId,
+            redirect_uri: this.redirectUri,
             response_type: 'code',
             scope: SCOPES.join(' '),
             access_type: 'offline',
@@ -125,11 +144,11 @@ export class GoogleFitService {
                     'Content-Type': 'application/x-www-form-urlencoded'
                 },
                 body: new URLSearchParams({
-                    client_id: this.config.clientId,
-                    client_secret: this.config.clientSecret,
+                    client_id: this.clientId,
+                    client_secret: this.clientSecret,
                     code: code,
                     grant_type: 'authorization_code',
-                    redirect_uri: this.config.redirectUri
+                    redirect_uri: this.redirectUri
                 }).toString()
             });
 
@@ -139,18 +158,64 @@ export class GoogleFitService {
             this.settings.googleTokenExpiry = Date.now() + (tokens.expires_in * 1000);
 
             // Save settings and immediately force refresh any open settings tabs
-            await this.config.onSettingsChange(this.settings);
+            await this.onSettingsChange(this.settings);
 
             // Force an immediate refresh of any open settings tabs
-            const settingTab = (this.config.app as any).setting?.activeTab;
+            const settingTab = (this.app as any).setting?.activeTab;
             if (settingTab?.id === 'jots-sleep-tracker') {
                 setTimeout(() => settingTab.display(), 0);
             }
 
+            new Notice('Successfully connected to Google Fit');
             return true;
         } catch (error) {
             console.error('Google Fit token request error:', error);
             throw error;
+        }
+    }
+
+    private async refreshAccessToken(): Promise<void> {
+        if (!this.settings.googleRefreshToken) {
+            throw new Error('No refresh token available');
+        }
+
+        try {
+            const response = await fetch('https://oauth2.googleapis.com/token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    client_id: this.clientId,
+                    client_secret: this.clientSecret,
+                    refresh_token: this.settings.googleRefreshToken,
+                    grant_type: 'refresh_token',
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Token refresh failed');
+            }
+
+            const data = await response.json();
+            this.settings.googleAccessToken = data.access_token;
+            this.settings.googleTokenExpiry = Date.now() + (data.expires_in * 1000);
+            await this.onSettingsChange(this.settings);
+        } catch (error) {
+            console.error('Failed to refresh access token:', error);
+            // Clear invalid tokens
+            this.settings.googleAccessToken = '';
+            this.settings.googleRefreshToken = '';
+            this.settings.googleTokenExpiry = undefined;
+            await this.onSettingsChange(this.settings);
+            throw error;
+        }
+    }
+
+    private async ensureValidToken(): Promise<void> {
+        // If we have an expiry time and the token is expired or about to expire (within 5 minutes)
+        if (this.settings.googleTokenExpiry && Date.now() + 300000 > this.settings.googleTokenExpiry) {
+            await this.refreshAccessToken();
         }
     }
 
@@ -163,10 +228,17 @@ export class GoogleFitService {
         const now = Date.now();
         const expiryTime = this.settings.googleTokenExpiry || 0;
 
-        // Only try to refresh if we have a refresh token and the access token is expired or about to expire
-        if (this.settings.googleRefreshToken && (now >= expiryTime - 60000)) {
+        // If we don't have an access token or it's expired/about to expire, try to refresh
+        if (!this.settings.googleAccessToken || (now >= expiryTime - 60000)) {
+            if (!this.settings.googleRefreshToken) {
+                // Clear invalid state and request re-authentication
+                this.settings.googleAccessToken = undefined;
+                this.settings.googleTokenExpiry = undefined;
+                await this.onSettingsChange(this.settings);
+                throw new Error('Not authenticated with Google Fit. Please disconnect and reconnect your account.');
+            }
+
             try {
-                console.log('Refreshing Google Fit access token...');
                 const response = await request({
                     url: 'https://oauth2.googleapis.com/token',
                     method: 'POST',
@@ -174,8 +246,8 @@ export class GoogleFitService {
                         'Content-Type': 'application/x-www-form-urlencoded'
                     },
                     body: new URLSearchParams({
-                        client_id: this.config.clientId,
-                        client_secret: this.config.clientSecret,
+                        client_id: this.clientId,
+                        client_secret: this.clientSecret,
                         refresh_token: this.settings.googleRefreshToken,
                         grant_type: 'refresh_token'
                     }).toString()
@@ -187,7 +259,6 @@ export class GoogleFitService {
                     throw new Error('Invalid response from Google OAuth server');
                 }
 
-                console.log('Successfully refreshed Google Fit access token');
                 this.settings.googleAccessToken = tokens.access_token;
                 this.settings.googleTokenExpiry = Date.now() + (tokens.expires_in * 1000);
 
@@ -196,14 +267,14 @@ export class GoogleFitService {
                     this.settings.googleRefreshToken = tokens.refresh_token;
                 }
 
-                await this.config.onSettingsChange(this.settings);
+                await this.onSettingsChange(this.settings);
             } catch (error) {
                 console.error('Failed to refresh Google Fit token:', error);
                 // Clear tokens to force re-authentication
                 this.settings.googleAccessToken = undefined;
                 this.settings.googleRefreshToken = undefined;
                 this.settings.googleTokenExpiry = undefined;
-                await this.config.onSettingsChange(this.settings);
+                await this.onSettingsChange(this.settings);
                 throw new Error('Failed to refresh authentication. Please disconnect and reconnect your Google Fit account.');
             }
         }
@@ -222,11 +293,6 @@ export class GoogleFitService {
         await this.refreshTokenIfNeeded();
 
         try {
-            console.log('Querying Google Fit for sleep data:', {
-                start: new Date(startTime * 1000).toISOString(),
-                end: new Date(endTime * 1000).toISOString()
-            });
-
             // Get sleep sessions data
             const sleepResponse = await request({
                 url: `https://www.googleapis.com/fitness/v1/users/me/sessions?startTime=${new Date(startTime * 1000).toISOString()}&endTime=${new Date(endTime * 1000).toISOString()}&activityType=72`,
@@ -283,7 +349,6 @@ export class GoogleFitService {
                 }
             }
 
-            console.log('Processed Google Fit sleep measurements:', measurements);
             return measurements;
         } catch (error) {
             console.error('Failed to fetch Google Fit sleep data:', error);
@@ -334,8 +399,7 @@ export class GoogleFitService {
                 body: JSON.stringify(session)
             });
 
-            const responseData = JSON.parse(response);
-            console.log('Google Fit sleep session update response:', responseData);
+            new Notice('Sleep session added to Google Fit');
         } catch (error) {
             console.error('Failed to add Google Fit sleep session:', error);
             throw error;

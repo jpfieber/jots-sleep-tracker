@@ -16,16 +16,25 @@ export default class SleepTrackerPlugin extends Plugin {
     journalService!: JournalService;
 
     async onload() {
+        console.log('Sleep Tracker: Loading Plugin...');
+
+        // Load settings first
         await this.loadSettings();
+
+        // Initialize services
         this.measurementService = new MeasurementService(this.app, this.settings);
         this.journalService = new JournalService(this.app, this.settings);
-
-        // Initialize style manager and apply styles
         this.styleManager = new StyleManager();
         this.styleManager.updateStyles(this.settings);
 
-        // Initialize Google Fit service if enabled
-        this.setupGoogleFitService();
+        // Setup Google Fit if enabled
+        if (this.settings.enableGoogleFit) {
+            this.setupGoogleFitService();
+            // If we have valid tokens, set up sync
+            if (this.settings.googleAccessToken && this.settings.googleRefreshToken) {
+                this.setupGoogleFitSync();
+            }
+        }
 
         // Add the settings tab
         this.addSettingTab(new SleepTrackerSettingsTab(this.app, this));
@@ -44,6 +53,7 @@ export default class SleepTrackerPlugin extends Plugin {
     }
 
     onunload() {
+        console.log('Sleep Tracker: Unloading Plugin...');
         // Clean up style manager
         this.styleManager.removeStyles();
 
@@ -54,17 +64,28 @@ export default class SleepTrackerPlugin extends Plugin {
     }
 
     async loadSettings() {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+        const data = await this.loadData();
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
+
+        // Clean up potentially invalid token state
+        if (!this.settings.googleRefreshToken) {
+            this.settings.googleAccessToken = '';
+            this.settings.googleTokenExpiry = undefined;
+        }
     }
 
     async saveSettings() {
         await this.saveData(this.settings);
         // Update services with new settings
+        this.styleManager.updateStyles(this.settings);
         this.journalService = new JournalService(this.app, this.settings);
-        // Update any open settings tabs
-        const settingTab = (this.app as any).setting?.activeTab;
-        if (settingTab?.id === 'jots-sleep-tracker') {
-            settingTab.display();
+
+        // Update Google Fit service if needed
+        if (this.settings.enableGoogleFit && this.settings.googleClientId && this.settings.googleClientSecret) {
+            this.setupGoogleFitService();
+            if (this.settings.googleAccessToken && this.settings.googleRefreshToken) {
+                this.setupGoogleFitSync();
+            }
         }
     }
 
@@ -81,11 +102,6 @@ export default class SleepTrackerPlugin extends Plugin {
                 new Notice('Please enter your Google Fit API credentials in the settings');
                 return;
             }
-
-            console.log('Initializing Google Fit service with:', {
-                hasClientId: !!this.settings.googleClientId,
-                hasClientSecret: !!this.settings.googleClientSecret
-            });
 
             this.googleFitService = new GoogleFitService(this.settings, {
                 clientId: this.settings.googleClientId,
@@ -159,29 +175,21 @@ export default class SleepTrackerPlugin extends Plugin {
                 // Query one day before and after to catch sleep sessions that cross midnight
                 startTime = moment(startDate).subtract(1, 'day').startOf('day').valueOf() / 1000;
                 endTime = moment(endDate).add(1, 'day').endOf('day').valueOf() / 1000;
-                
-                console.log('Using date range:', {
-                    startDate,
-                    endDate,
-                    queryStartTimeFormatted: moment(startTime * 1000).format('YYYY-MM-DD HH:mm:ss'),
-                    queryEndTimeFormatted: moment(endTime * 1000).format('YYYY-MM-DD HH:mm:ss')
-                });
+
+                new Notice(`Syncing sleep data from ${startDate} to ${endDate}`);
             } else {
                 // Default to last 7 days, plus padding days
                 const now = moment();
                 endTime = now.add(1, 'day').endOf('day').valueOf() / 1000;
                 startTime = now.subtract(8, 'days').startOf('day').valueOf() / 1000;
-                
-                console.log('Using default 7-day range:', {
-                    startTimeFormatted: moment(startTime * 1000).format('YYYY-MM-DD HH:mm:ss'),
-                    endTimeFormatted: moment(endTime * 1000).format('YYYY-MM-DD HH:mm:ss')
-                });
+
+                new Notice('Syncing sleep data from the last 7 days');
             }
 
             // Calculate total days for progress tracking (not including padding days)
             const totalDays = Math.ceil((
-                moment(endDate || moment()).endOf('day').valueOf() - 
-                moment(startDate || moment().subtract(7, 'days')).startOf('day'). valueOf()
+                moment(endDate || moment()).endOf('day').valueOf() -
+                moment(startDate || moment().subtract(7, 'days')).startOf('day').valueOf()
             ) / (24 * 60 * 60 * 1000));
             const processedDays = new Set<string>();
 
@@ -238,10 +246,10 @@ export default class SleepTrackerPlugin extends Plugin {
             events.sort((a, b) => {
                 const dateCompare = a.date.localeCompare(b.date);
                 if (dateCompare !== 0) return dateCompare;
-                
+
                 const timeCompare = a.time.localeCompare(b.time);
                 if (timeCompare !== 0) return timeCompare;
-                
+
                 // If date and time are equal, put sleep events first
                 return a.type === 'sleep' ? -1 : 1;
             });

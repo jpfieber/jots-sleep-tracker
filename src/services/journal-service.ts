@@ -49,26 +49,24 @@ export class JournalService {
 
     private async appendEntry(date: string, content: string): Promise<void> {
         const journalPath = getJournalPath(date, this.settings);
-        console.log('JournalService: Attempting to append to path:', journalPath);
         let file = this.app.vault.getAbstractFileByPath(journalPath);
         let journalContent = '';
 
         // If file doesn't exist, create it and ensure it's ready
         if (!(file instanceof TFile)) {
-            console.log('JournalService: File does not exist, creating new file');
             try {
                 file = await this.createJournalFile(journalPath, date);
                 await new Promise(resolve => setTimeout(resolve, 500));
 
                 const verifiedFile = await this.waitForFile(journalPath);
                 if (!verifiedFile) {
-                    console.error('JournalService: Failed to verify journal file after creation');
                     throw new Error('Failed to verify journal file after creation');
                 }
                 file = verifiedFile;
-                console.log('JournalService: Successfully created and verified new file');
+                new Notice(`Created journal: ${journalPath}`);
             } catch (error) {
                 console.error('Error creating journal file:', error);
+                new Notice('Failed to create journal file. Please try again.');
                 throw new Error('Failed to create or verify journal file');
             }
         }
@@ -78,16 +76,13 @@ export class JournalService {
             try {
                 if (file instanceof TFile) {
                     journalContent = await this.app.vault.read(file);
-                    console.log('JournalService: Read existing content, length:', journalContent.length);
                     if (journalContent.includes('{{')) {
-                        console.log('JournalService: Found template markers, waiting for processing...');
                         await new Promise(resolve => setTimeout(resolve, 500));
                         continue;
                     }
                     break;
                 }
             } catch (error) {
-                console.log('JournalService: Read attempt', attempt + 1, 'failed:', error);
                 if (attempt === 2) throw error;
                 await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)));
             }
@@ -95,13 +90,11 @@ export class JournalService {
 
         // Check for existing entry
         if (this.hasExistingSleepEntry(journalContent, date, content)) {
-            console.log('JournalService: Found existing sleep entry, skipping append');
             return;
         }
 
         // Simple check - if the exact string already exists, don't add it again
         if (!journalContent.includes(content.trim())) {
-            console.log('JournalService: Adding new entry to journal');
             // Append the new entry to the file
             const newContent = journalContent.trim() === ''
                 ? content
@@ -112,17 +105,14 @@ export class JournalService {
                 for (let attempt = 0; attempt < 3; attempt++) {
                     try {
                         await this.app.vault.modify(file, newContent);
-                        console.log('JournalService: Successfully updated journal file');
+                        new Notice(`Updated journal: ${journalPath}`);
                         break;
                     } catch (error) {
-                        console.log('JournalService: Update attempt', attempt + 1, 'failed:', error);
                         if (attempt === 2) throw error;
                         await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)));
                     }
                 }
             }
-        } else {
-            console.log('JournalService: Entry already exists in journal, skipping append');
         }
     }
 
@@ -136,9 +126,8 @@ export class JournalService {
                     if (!content.includes('{{')) {
                         return file;
                     }
-                    console.log(`Template not yet processed, attempt ${i + 1}`);
                 } catch (error) {
-                    console.log(`File exists but not ready for reading, attempt ${i + 1}`);
+                    // Continue trying
                 }
             }
             delay = Math.min(delay * 1.5, 1000);
@@ -219,12 +208,9 @@ export class JournalService {
             const date = input;
             const previousDate = (window as any).moment(date).subtract(1, 'day').format('YYYY-MM-DD');
             const previousJournalPath = getJournalPath(previousDate, this.settings);
-            console.log('[Sleep Tracker Debug] Previous journal path:', previousJournalPath);
 
             if (await this.app.vault.adapter.exists(previousJournalPath)) {
-                console.log('[Sleep Tracker Debug] Found previous day journal file');
                 const content = await this.app.vault.adapter.read(previousJournalPath);
-                console.log('[Sleep Tracker Debug] Previous day journal content:', content);
                 return this.extractSleepTimeFromContent(content);
             }
             return null;
@@ -235,7 +221,6 @@ export class JournalService {
     }
 
     private extractSleepTimeFromContent(content: string): string | null {
-        console.log('[Sleep Tracker Debug] Searching through lines for asleep entry...');
         const lines = content.split('\n');
         for (const line of lines) {
             if (line.includes('(type:: 💤)')) {
@@ -316,6 +301,7 @@ export class JournalService {
                 if (!(file instanceof TFile)) {
                     throw new Error('Failed to verify sleep note file after creation');
                 }
+                new Notice(`Created sleep note: ${this.settings.sleepNotePath}`);
             }
 
             // Read existing content with retry
@@ -332,7 +318,6 @@ export class JournalService {
                     }
                     await new Promise(resolve => setTimeout(resolve, 500));
                 } catch (error) {
-                    console.log('Sleep note read attempt', attempt + 1, 'failed:', error);
                     await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)));
                 }
             }
@@ -387,10 +372,9 @@ export class JournalService {
                     try {
                         await this.app.vault.modify(file, content + '\n');
                         writeSuccess = true;
-                        console.log('Successfully updated sleep note');
+                        new Notice(`Updated sleep note: ${this.settings.sleepNotePath}`);
                         break;
                     } catch (error) {
-                        console.log('Sleep note write attempt', attempt + 1, 'failed:', error);
                         await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)));
                     }
                 }
@@ -410,19 +394,14 @@ export class JournalService {
         try {
             if (this.settings.enableJournalEntry) {
                 const prefix = `- [${this.settings.stringPrefixLetter}] `;
-                console.log('JournalService: Starting appendToJournal with data:', data);
-                console.log('JournalService: Using prefix:', prefix);
-                console.log('JournalService: Current settings:', this.settings);
 
                 if (data.asleepTime) {
                     const [date, time] = data.date.split(' ');
                     const formattedTime = this.formatTime(time);
                     const militaryTime = this.formatMilitaryTime(time);
-                    console.log('JournalService: Adding asleep entry for date:', date, 'time:', formattedTime);
                     const asleepEntry = prefix + this.settings.asleepEntryTemplate
                         .replace('<time>', formattedTime)
                         .replace('<mtime>', militaryTime) + '\n';
-                    console.log('JournalService: Generated asleep entry:', asleepEntry);
                     await this.appendEntry(date, asleepEntry);
                 }
 
@@ -442,12 +421,10 @@ export class JournalService {
                         duration = data.sleepDuration.toString();
                     }
 
-                    console.log('JournalService: Adding awake entry for date:', date, 'time:', formattedTime);
                     const awakeEntry = prefix + this.settings.awakeEntryTemplate
                         .replace('<time>', formattedTime)
                         .replace('<mtime>', militaryTime)
                         .replace('<duration>', duration) + '\n';
-                    console.log('JournalService: Generated awake entry:', awakeEntry);
                     await this.appendEntry(date, awakeEntry);
                 }
             }
