@@ -155,18 +155,31 @@ export default class SleepTrackerPlugin extends Plugin {
             const moment = (window as any).moment;
 
             if (startDate && endDate) {
-                // Use provided date range
-                startTime = moment(startDate).startOf('day').unix();
-                endTime = moment(endDate).endOf('day').unix();
+                // Parse dates in local timezone and set to start/end of day
+                startTime = moment(startDate).startOf('day').valueOf() / 1000;
+                endTime = moment(endDate).endOf('day').valueOf() / 1000;
+
+                console.log('Using date range:', {
+                    startDate,
+                    endDate,
+                    startTimeFormatted: moment(startTime * 1000).format('YYYY-MM-DD HH:mm:ss'),
+                    endTimeFormatted: moment(endTime * 1000).format('YYYY-MM-DD HH:mm:ss')
+                });
             } else {
                 // Default to last 7 days
-                endTime = Math.floor(new Date().getTime() / 1000);
-                startTime = endTime - (7 * 24 * 60 * 60);
+                const now = moment();
+                endTime = now.endOf('day').valueOf() / 1000;
+                startTime = now.subtract(7, 'days').startOf('day').valueOf() / 1000;
+
+                console.log('Using default 7-day range:', {
+                    startTimeFormatted: moment(startTime * 1000).format('YYYY-MM-DD HH:mm:ss'),
+                    endTimeFormatted: moment(endTime * 1000).format('YYYY-MM-DD HH:mm:ss')
+                });
             }
 
             // Calculate total days for progress tracking
             const totalDays = Math.ceil((endTime - startTime) / (24 * 60 * 60));
-            let processedDays = new Set();
+            const processedDays = new Set<string>();
 
             const sleepMeasurements = await this.googleFitService.getSleepMeasurements(startTime, endTime);
 

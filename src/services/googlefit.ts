@@ -155,14 +155,16 @@ export class GoogleFitService {
     }
 
     private async refreshTokenIfNeeded(): Promise<void> {
-        if (!this.settings.googleRefreshToken) {
+        // Check if we have any authentication tokens
+        if (!this.settings.googleAccessToken && !this.settings.googleRefreshToken) {
             throw new Error('Not authenticated with Google Fit. Please disconnect and reconnect your account.');
         }
 
         const now = Date.now();
         const expiryTime = this.settings.googleTokenExpiry || 0;
 
-        if (now >= expiryTime - 60000) { // Refresh if token expires in less than a minute
+        // Only try to refresh if we have a refresh token and the access token is expired or about to expire
+        if (this.settings.googleRefreshToken && (now >= expiryTime - 60000)) {
             try {
                 console.log('Refreshing Google Fit access token...');
                 const response = await request({
@@ -181,6 +183,7 @@ export class GoogleFitService {
 
                 const tokens = JSON.parse(response);
                 if (!tokens.access_token) {
+                    console.error('Invalid response from Google OAuth server:', tokens);
                     throw new Error('Invalid response from Google OAuth server');
                 }
 
