@@ -4,12 +4,29 @@ There are many reasons to track your sleep, this plugin will help you do that wi
 
 While primarily designed to capture data into the JOTS framework, this plugin provides customization options to allow its use in almost any system. 
 
+## Installation
+
+### From within Obsidian
+
+1. Open Settings > Community plugins
+2. Click "Turn on community plugins" if you haven't already
+3. Click "Browse" and search for "Sleep Tracker"
+4. Click "Install"
+5. Once installed, close the Community plugins window and activate the plugin
+
+### Manual installation
+
+1. Download the latest release from the [GitHub releases page](https://github.com/jpfieber/jots-sleep-tracker/releases)
+2. Extract the zip archive into your Obsidian vault's `.obsidian/plugins` folder
+3. Reload Obsidian
+4. Enable the plugin in Settings > Community plugins
+
 ## Configuration
 
 ### Enable Google Fit Integration
 
 Note: If you intend to capture your sleep data manually with a form, you can skip this step.
-There's a bit of work you'll have to do in the Google enviornment to allow us to connect and capture your data.
+There's a bit of work you'll have to do in the Google environment to allow us to connect and capture your data.
 1. Create Google Cloud Project
 2. Activate Google Tasks API
 3. Configure OAUTH screen

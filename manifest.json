@@ -2,11 +2,11 @@
   "id": "jots-sleep-tracker",
   "name": "Sleep Tracker",
   "version": "1.0.0",
-  "author": "Your Name",
+  "author": "Joseph Fieber",
   "description": "Track and visualize your sleep patterns in Obsidian with Google Fit integration",
   "main": "main.js",
   "stylesheets": [
-    "src/styles/styles.css"
+    "styles.css"
   ],
   "minAppVersion": "0.15.0",
   "apiVersion": "1.0.0",
@@ -19,7 +19,7 @@
       "unit": "cm"
     }
   },
-  "authorUrl": "https://your-website.com",
+  "authorUrl": "https://jots.life",
   "isDesktopOnly": false,
   "commands": [
     {

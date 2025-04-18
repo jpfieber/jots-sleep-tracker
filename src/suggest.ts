@@ -194,7 +194,7 @@ export abstract class TextInputSuggest<T> implements ISuggestOwner<T> {
     close(): void {
         // Clear scope without using unregister
         this.scope = new Scope();
-        
+
         this.suggest.setSuggestions([]);
         if (this.popper) {
             this.popper.destroy();

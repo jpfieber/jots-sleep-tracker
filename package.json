@@ -1,8 +1,8 @@
 {
   "name": "jots-sleep-tracker",
   "version": "1.0.0",
-  "description": "An Obsidian plugin to track sleep.",
-  "main": "dist/main.js",
+  "description": "Track and visualize your sleep patterns in Obsidian with Google Fit integration",
+  "main": "main.js",
   "scripts": {
     "build": "node esbuild.config.mjs production",
     "dev": "node esbuild.config.mjs --watch",
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@popperjs/core": "^2.11.8",
-    "obsidian": "^0.12.0"
+    "obsidian": "^1.4.11"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^28.0.3",
@@ -26,8 +26,14 @@
   "keywords": [
     "obsidian",
     "plugin",
-    "sleep"
+    "sleep",
+    "sleep-tracking",
+    "google-fit"
   ],
-  "author": "Your Name",
-  "license": "MIT"
+  "author": "Joseph Fieber",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jpfieber/jots-sleep-tracker"
+  }
 }
