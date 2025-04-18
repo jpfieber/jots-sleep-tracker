@@ -1,4 +1,4 @@
-import { request, Notice } from 'obsidian';
+import { request, Notice, App } from 'obsidian';
 import type { Settings } from '../types';
 import { OAuthCallbackServer } from './oauth-server';
 
@@ -52,7 +52,6 @@ export class GoogleFitService {
     private scope: string[];
     private onSettingsChange: (settings: Settings) => Promise<void>;
     private app: App;
-    private server?: OAuthServer;
     private lastRequestTime = 0;
     private readonly minRequestInterval = 1000; // 1 second between requests
     private oauthServer: OAuthCallbackServer;
@@ -219,7 +218,7 @@ export class GoogleFitService {
         }
     }
 
-    private async refreshTokenIfNeeded(): Promise<void> {
+    public async refreshTokenIfNeeded(): Promise<void> {
         // Check if we have any authentication tokens
         if (!this.settings.googleAccessToken && !this.settings.googleRefreshToken) {
             throw new Error('Not authenticated with Google Fit. Please disconnect and reconnect your account.');

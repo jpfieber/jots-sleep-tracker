@@ -18,7 +18,6 @@ export class StyleManager {
     setCustomIcon(iconData: string) {
         // Handle empty or invalid input
         if (!iconData || iconData.trim() === '') {
-            console.log('StyleManager: No icon data provided');
             this.isEmojiIcon = false;
             this.customIcon = null;
             return;
@@ -27,12 +26,10 @@ export class StyleManager {
         const trimmedData = iconData.trim();
         // If 1-2 characters, treat as emoji
         if (isEmoji(trimmedData)) {
-            console.log('StyleManager: Detected emoji icon:', trimmedData);
             this.isEmojiIcon = true;
             this.customIcon = trimmedData;
         } else {
             // Otherwise treat as SVG
-            console.log('StyleManager: Processing SVG icon data:', trimmedData.substring(0, 50) + '...');
             this.isEmojiIcon = false;
             this.customIcon = svgToDataUri(trimmedData);
         }

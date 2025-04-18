@@ -31,10 +31,20 @@ export default class SleepTrackerPlugin extends Plugin {
 
         // Setup Google Fit if enabled
         if (this.settings.enableGoogleFit) {
-            this.setupGoogleFitService();
-            // If we have valid tokens, set up sync
-            if (this.settings.googleAccessToken && this.settings.googleRefreshToken) {
-                this.setupGoogleFitSync();
+            await this.setupGoogleFitService();
+            // If we have valid tokens, attempt refresh and set up sync
+            if (this.settings.googleRefreshToken) {
+                try {
+                    await this.googleFitService?.refreshTokenIfNeeded();
+                    this.setupGoogleFitSync();
+                } catch (error) {
+                    console.error('Failed to refresh Google Fit token on load:', error);
+                    // Token refresh failed, but we'll keep the refresh token
+                    // User can try manual reconnect if needed
+                    this.settings.googleAccessToken = '';
+                    this.settings.googleTokenExpiry = undefined;
+                    await this.saveSettings();
+                }
             }
         }
 
