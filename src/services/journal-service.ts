@@ -297,35 +297,47 @@ export class JournalService {
                 if (folder) {
                     await this.ensureFolderExists(folder);
                 }
-                file = await this.app.vault.create(this.settings.sleepNotePath, '# Sleep Tracking\n\n| Date | Time | Type | Duration |\n|------|------|------|----------|\n');
+                const initialContent = '# Sleep Tracking\n\n| Date | Time | Type | Duration |\n|------|------|------|----------|\n';
+                file = await this.app.vault.create(this.settings.sleepNotePath, initialContent);
 
-                const verifiedFile = await this.waitForFile(this.settings.sleepNotePath);
-                if (!verifiedFile) {
+                // Wait for the file to be ready with multiple attempts
+                for (let i = 0; i < 10; i++) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    const verifiedFile = await this.waitForFile(this.settings.sleepNotePath);
+                    if (verifiedFile) {
+                        const content = await this.app.vault.read(verifiedFile);
+                        if (!content.includes('{{')) {
+                            file = verifiedFile;
+                            break;
+                        }
+                    }
+                }
+
+                if (!(file instanceof TFile)) {
                     throw new Error('Failed to verify sleep note file after creation');
                 }
-                file = verifiedFile;
             }
 
             // Read existing content with retry
             let content = '';
+            let readSuccess = false;
             for (let attempt = 0; attempt < 3; attempt++) {
                 try {
                     if (file instanceof TFile) {
                         content = await this.app.vault.read(file);
-                        if (content.includes('{{')) {
-                            await new Promise(resolve => setTimeout(resolve, 500));
-                            continue;
+                        if (!content.includes('{{')) {
+                            readSuccess = true;
+                            break;
                         }
-                        break;
                     }
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 } catch (error) {
                     console.log('Sleep note read attempt', attempt + 1, 'failed:', error);
-                    if (attempt === 2) throw error;
                     await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)));
                 }
             }
 
-            if (!content) {
+            if (!readSuccess) {
                 throw new Error('Could not read sleep note content');
             }
 
@@ -339,7 +351,7 @@ export class JournalService {
                     const entry = this.settings.asleepNoteTemplate
                         .replace('<date>', date)
                         .replace('<time>', formattedTime)
-                        .replace('<mtime>', militaryTime) + '\n';
+                        .replace('<mtime>', militaryTime);
                     content = content.trim() + '\n' + entry;
                     modifiedContent = true;
                 }
@@ -362,24 +374,29 @@ export class JournalService {
                         .replace('<date>', date)
                         .replace('<time>', formattedTime)
                         .replace('<mtime>', militaryTime)
-                        .replace('<duration>', duration) + '\n';
+                        .replace('<duration>', duration);
                     content = content.trim() + '\n' + entry;
                     modifiedContent = true;
                 }
             }
 
-            // Only modify the file if we actually added new content
+            // Only modify the file if we actually added new content and have a valid file
             if (modifiedContent && file instanceof TFile) {
+                let writeSuccess = false;
                 for (let attempt = 0; attempt < 3; attempt++) {
                     try {
-                        await this.app.vault.modify(file, content);
+                        await this.app.vault.modify(file, content + '\n');
+                        writeSuccess = true;
                         console.log('Successfully updated sleep note');
                         break;
                     } catch (error) {
-                        console.log('Sleep note update attempt', attempt + 1, 'failed:', error);
-                        if (attempt === 2) throw error;
+                        console.log('Sleep note write attempt', attempt + 1, 'failed:', error);
                         await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)));
                     }
+                }
+
+                if (!writeSuccess) {
+                    throw new Error('Failed to write to sleep note after multiple attempts');
                 }
             }
         } catch (error) {

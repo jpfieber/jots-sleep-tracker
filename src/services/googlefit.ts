@@ -155,13 +155,16 @@ export class GoogleFitService {
     }
 
     private async refreshTokenIfNeeded(): Promise<void> {
-        if (!this.settings.googleRefreshToken) return;
+        if (!this.settings.googleRefreshToken) {
+            throw new Error('Not authenticated with Google Fit. Please disconnect and reconnect your account.');
+        }
 
         const now = Date.now();
         const expiryTime = this.settings.googleTokenExpiry || 0;
 
         if (now >= expiryTime - 60000) { // Refresh if token expires in less than a minute
             try {
+                console.log('Refreshing Google Fit access token...');
                 const response = await request({
                     url: 'https://oauth2.googleapis.com/token',
                     method: 'POST',
@@ -177,12 +180,28 @@ export class GoogleFitService {
                 });
 
                 const tokens = JSON.parse(response);
+                if (!tokens.access_token) {
+                    throw new Error('Invalid response from Google OAuth server');
+                }
+
+                console.log('Successfully refreshed Google Fit access token');
                 this.settings.googleAccessToken = tokens.access_token;
                 this.settings.googleTokenExpiry = Date.now() + (tokens.expires_in * 1000);
+
+                // If we got a new refresh token, update it
+                if (tokens.refresh_token) {
+                    this.settings.googleRefreshToken = tokens.refresh_token;
+                }
+
                 await this.config.onSettingsChange(this.settings);
             } catch (error) {
-                console.error('Failed to refresh token:', error);
-                throw error;
+                console.error('Failed to refresh Google Fit token:', error);
+                // Clear tokens to force re-authentication
+                this.settings.googleAccessToken = undefined;
+                this.settings.googleRefreshToken = undefined;
+                this.settings.googleTokenExpiry = undefined;
+                await this.config.onSettingsChange(this.settings);
+                throw new Error('Failed to refresh authentication. Please disconnect and reconnect your Google Fit account.');
             }
         }
     }
