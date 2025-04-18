@@ -156,72 +156,104 @@ export default class SleepTrackerPlugin extends Plugin {
 
             if (startDate && endDate) {
                 // Parse dates in local timezone and set to start/end of day
-                startTime = moment(startDate).startOf('day').valueOf() / 1000;
-                endTime = moment(endDate).endOf('day').valueOf() / 1000;
-
+                // Query one day before and after to catch sleep sessions that cross midnight
+                startTime = moment(startDate).subtract(1, 'day').startOf('day').valueOf() / 1000;
+                endTime = moment(endDate).add(1, 'day').endOf('day').valueOf() / 1000;
+                
                 console.log('Using date range:', {
                     startDate,
                     endDate,
-                    startTimeFormatted: moment(startTime * 1000).format('YYYY-MM-DD HH:mm:ss'),
-                    endTimeFormatted: moment(endTime * 1000).format('YYYY-MM-DD HH:mm:ss')
+                    queryStartTimeFormatted: moment(startTime * 1000).format('YYYY-MM-DD HH:mm:ss'),
+                    queryEndTimeFormatted: moment(endTime * 1000).format('YYYY-MM-DD HH:mm:ss')
                 });
             } else {
-                // Default to last 7 days
+                // Default to last 7 days, plus padding days
                 const now = moment();
-                endTime = now.endOf('day').valueOf() / 1000;
-                startTime = now.subtract(7, 'days').startOf('day').valueOf() / 1000;
-
+                endTime = now.add(1, 'day').endOf('day').valueOf() / 1000;
+                startTime = now.subtract(8, 'days').startOf('day').valueOf() / 1000;
+                
                 console.log('Using default 7-day range:', {
                     startTimeFormatted: moment(startTime * 1000).format('YYYY-MM-DD HH:mm:ss'),
                     endTimeFormatted: moment(endTime * 1000).format('YYYY-MM-DD HH:mm:ss')
                 });
             }
 
-            // Calculate total days for progress tracking
-            const totalDays = Math.ceil((endTime - startTime) / (24 * 60 * 60));
+            // Calculate total days for progress tracking (not including padding days)
+            const totalDays = Math.ceil((
+                moment(endDate || moment()).endOf('day').valueOf() - 
+                moment(startDate || moment().subtract(7, 'days')).startOf('day'). valueOf()
+            ) / (24 * 60 * 60 * 1000));
             const processedDays = new Set<string>();
 
             const sleepMeasurements = await this.googleFitService.getSleepMeasurements(startTime, endTime);
 
+            // Create arrays to hold sleep and wake events
+            type SleepEvent = {
+                type: 'sleep' | 'wake';
+                date: string;
+                time: string;
+                record: MeasurementRecord;
+            };
+            const events: SleepEvent[] = [];
+
             for (const measurement of sleepMeasurements) {
-                // Handle sleep (start) time
-                const sleepTimeStr = moment(measurement.startTime * 1000).format('HH:mm');
-                const sleepDateStr = moment(measurement.startTime * 1000).format('YYYY-MM-DD');
+                const sleepMoment = moment(measurement.startTime * 1000);
+                const wakeMoment = moment(measurement.endTime * 1000);
+                const sleepDateStr = sleepMoment.format('YYYY-MM-DD');
+                const wakeDateStr = wakeMoment.format('YYYY-MM-DD');
 
-                const sleepRecord: MeasurementRecord = {
-                    date: `${sleepDateStr} ${sleepTimeStr}`,
-                    userId: this.settings.defaultUser || this.settings.users[0]?.id || '',
-                    asleepTime: sleepTimeStr
-                };
+                // Add wake events that occur within our target range
+                if (moment(wakeDateStr).isBetween(moment(startDate), moment(endDate), 'day', '[]')) {
+                    const wakeTimeStr = wakeMoment.format('HH:mm');
+                    events.push({
+                        type: 'wake',
+                        date: wakeDateStr,
+                        time: wakeTimeStr,
+                        record: {
+                            date: `${wakeDateStr} ${wakeTimeStr}`,
+                            userId: this.settings.defaultUser || this.settings.users[0]?.id || '',
+                            awakeTime: wakeTimeStr,
+                            sleepDuration: measurement.sleepDuration?.toFixed(1)
+                        }
+                    });
+                }
 
-                // Track processed day and update progress
-                processedDays.add(sleepDateStr);
+                // Add sleep events that occur within our target range
+                if (moment(sleepDateStr).isBetween(moment(startDate), moment(endDate), 'day', '[]')) {
+                    const sleepTimeStr = sleepMoment.format('HH:mm');
+                    events.push({
+                        type: 'sleep',
+                        date: sleepDateStr,
+                        time: sleepTimeStr,
+                        record: {
+                            date: `${sleepDateStr} ${sleepTimeStr}`,
+                            userId: this.settings.defaultUser || this.settings.users[0]?.id || '',
+                            asleepTime: sleepTimeStr
+                        }
+                    });
+                }
+            }
+
+            // Sort events by date and time, putting sleep events before wake events on the same datetime
+            events.sort((a, b) => {
+                const dateCompare = a.date.localeCompare(b.date);
+                if (dateCompare !== 0) return dateCompare;
+                
+                const timeCompare = a.time.localeCompare(b.time);
+                if (timeCompare !== 0) return timeCompare;
+                
+                // If date and time are equal, put sleep events first
+                return a.type === 'sleep' ? -1 : 1;
+            });
+
+            // Process events in order
+            for (const event of events) {
+                processedDays.add(event.date);
                 if (progressCallback) {
                     progressCallback(processedDays.size, totalDays);
                 }
 
-                // Add sleep record to appropriate locations
-                await this.saveMeasurement(sleepRecord);
-
-                // Handle wake (end) time
-                const wakeTimeStr = moment(measurement.endTime * 1000).format('HH:mm');
-                const wakeDateStr = moment(measurement.endTime * 1000).format('YYYY-MM-DD');
-
-                const wakeRecord: MeasurementRecord = {
-                    date: `${wakeDateStr} ${wakeTimeStr}`,
-                    userId: this.settings.defaultUser || this.settings.users[0]?.id || '',
-                    awakeTime: wakeTimeStr,
-                    sleepDuration: measurement.sleepDuration?.toFixed(1)
-                };
-
-                // Track processed day and update progress
-                processedDays.add(wakeDateStr);
-                if (progressCallback) {
-                    progressCallback(processedDays.size, totalDays);
-                }
-
-                // Add wake record to appropriate locations
-                await this.saveMeasurement(wakeRecord);
+                await this.saveMeasurement(event.record);
             }
 
             const dateRangeStr = startDate && endDate
