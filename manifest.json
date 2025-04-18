@@ -1,7 +1,7 @@
 {
   "id": "jots-sleep-tracker",
   "name": "Sleep Tracker",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "author": "Joseph Fieber",
   "description": "Track and visualize your sleep patterns in Obsidian with Google Fit integration",
   "main": "main.js",

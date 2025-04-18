@@ -244,8 +244,17 @@
    Styles for the website and donation sections
    ================= */
 .jots-sleep-tracker-website-section {
-    margin: 2em 0;
-    text-align: center;
+    display: flex;
+    align-items: center;
+    margin: 20px 0;
+    padding: 0.5rem;
+    opacity: 0.75;
+}
+
+.jots-sleep-tracker-website-section img {
+    width: 64px;
+    height: 64px;
+    margin-right: 15px;
 }
 
 .jots-sleep-tracker-website-description {

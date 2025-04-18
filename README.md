@@ -2,11 +2,9 @@
 
 There are many reasons to track your sleep, this plugin will help you do that with multiple options for capturing your sleep data. Your sleep events can either be captured to your daily journals, or to a dedicated 'Sleep Note'. Sleep data can be captured either manually via a form you fill out, or automatically by syncing with the Google Fit app, which allows capture of data provided by various sleep related apps and devices.  The information captured includes the date and time you went to sleep, woke up, and what the duration of your sleep was.
 
-While primarily designed to capture data into the JOTS framework, this plugin provides customization options to allow its use in almost any system. 
+While primarily designed to capture data into the JOTS framework, this plugin provides customization options to allow its use in almost any setup. 
 
 ## Installation
-
-### From within Obsidian
 
 1. Open Settings > Community plugins
 2. Click "Turn on community plugins" if you haven't already
@@ -14,36 +12,51 @@ While primarily designed to capture data into the JOTS framework, this plugin pr
 4. Click "Install"
 5. Once installed, close the Community plugins window and activate the plugin
 
-### Manual installation
-
-1. Download the latest release from the [GitHub releases page](https://github.com/jpfieber/jots-sleep-tracker/releases)
-2. Extract the zip archive into your Obsidian vault's `.obsidian/plugins` folder
-3. Reload Obsidian
-4. Enable the plugin in Settings > Community plugins
-
 ## Configuration
 
 ### Enable Google Fit Integration
 
-Note: If you intend to capture your sleep data manually with a form, you can skip this step.
-There's a bit of work you'll have to do in the Google environment to allow us to connect and capture your data.
-1. Create Google Cloud Project
-2. Activate Google Tasks API
-3. Configure OAUTH screen
-    - Select Extern
-    - Fill necessary inputs
-    - Add your email as tester if using "@gmail" add gmail and googlemail
-    - Add API Token
-4. Add OAUTH client
-    - select Webclient
-    - add http://127.0.0.1:42813 as Javascript origin
-    - add http://127.0.0.1:42813/callback as redirect URI
+Note: If you intend to capture your sleep data manually with a form, you can skip this section.
 
-Once that's done, we'll need to add two pieces of information to the plugin settings:
-1. Client ID
-2. Client Secret
+#### Google Project Setup
+There's a bit of work you'll have to do in the Google environment to allow us to connect and capture your data. On any of the links below, right-click the link and choose 'Open in new tab' or 'Open in new window' so these instructions can stay open for you.
+1. **Create a Google Cloud Project**
+    - Open [this link](https://console.cloud.google.com/projectcreate?).
+    - Give the project any name you'd like. I called mine 'Obsidian' since I plan on using it for all Obsidian/Google integrations.
+    - You can leave 'Location' set to 'No organization'.
+    - Click 'Create'
+2. **Activate the Fitness API**
+    - Here we select which Google products to give this project access to. We only need sleep data, which is part of the Google Fit product, and the tool that gives us access is referred to as 'Fitness API'.
+    - Open [this link](https://console.cloud.google.com/apis/api/fitness.googleapis.com) and click 'Enable'
+3. **Configure OAUTH**
+    - Open [this link](https://console.cloud.google.com/apis/credentials/consent)' for settings related to the 'OAuth consent screen'.
+    - Click the 'Get started' button.
+    - Enter an 'App name'. I chose 'Obsidian'.
+    - Choose your email address from the dropdown
+    - Click 'Next'
+    - Choose 'External' for our 'Audience' and click 'Next'
+    - Enter an email address where you'll get notifications about the project you are creating and click 'Next'
+    - Check the box to agree to the Google API Services User Data Policy and click 'Continue'
+    - Click 'Create'
+    - With the OAuth configuration created, we now need to create the 'OAuth client'. Click the 'Create OAuth client' button under the 'Metrics' heading
+    - For 'Application type' choose 'Web application'
+    - For 'Name' enter what you'd like, I chose 'Obsidian Web Client'.
+    - Under 'Authorized JavaScript origins', click 'Add URI' and add the path `http://localhost:16321`
+    - Under 'Authorized redirect URIs', click 'Add URI' and add the path `http://localhost:16321/callback`, then click 'Create'
+    - A screen will appear that includes your 'Client ID' and 'Client Secret'. Copy these so we can later enter them into the settings for Sleep Tracker, then click 'OK'.
+    - Click on [Audience](https://console.cloud.google.com/auth/audience) in the menu on the left and under the 'Test users' heading click the '+ Add users' button.
+    - Enter your email and click Save. This gives your email permission to access your Google Fit data through this project.
 
-With that information provided, click the 'Connect' button and you should see a webpage open in your web browser and show a message that the connection was successful, followed by the status in the plugin settings changeing to 'Connected' with the button changing from 'Connect' to 'Disconnect', and a Manual Data Sync section becoming visible.  If all that happens, you've successfully enabled the Google Fit integration!
+#### Sleep Tracker Setup
+
+    1. Enter the 'Client ID' we copied earlier
+    2. Enter the 'Client Secret' we copied earlier
+    3. Click 'Connect'
+    4. In the webpage that opens up, select your account
+    5. A page will appear that says "Google hasn't verified this app", click the small 'Continue' link.
+    6. Check the 'Select all' box to allow the plugin to access your sleep data through the Google Fit API.
+    7. You should see an "Authentication successful! page that you can close.
+    8. Return to the plugin Settings Tab and you should see the status has changed from 'Disconnected' to 'Connected'. You're finished integrating Sleep Tracker with Google Fit!
 
 ### Enable Journal Entries
 
@@ -69,3 +82,25 @@ If you want to add sleep data to a dedicated 'Sleep Note', you'll need to enable
 - **Sleep Note Location**: This is the full path to the note, including the note name. For example, my sleep note is located at `Notes/SleepLog.md`. Ideally you should create the note ahead of time and format it as you like. I want my sleep data to appear in a table format, so I start with `| Date | Time | Type | Duration |` followed by `|------|------|------|----------|` on the next line. I then have the sleep data formatted so the entries below this heading will be formatted into a table.
 - **Asleep Entry Format**: This is how the sleep data will appear in the sleep note. Available placeholders are `<date>` (eg. `2025-04-17`), `<time>` (eg. `2:00PM`) and `<mtime>` (eg. `14:00`).  For example, mine looks like `| <date> | <time> | 💤 Asleep | |` so it formats into a table. Note that duration is not available for 'Asleep' entries because we don't yet know how long you slept, so in my case, I left a blank column in the table.
 - **Awake Entry Format**: This is how the sleep data will appear in the sleep note. Available placeholders are `<date>` (eg. `2025-04-17`), `<time>` (eg. `2:00PM`) and `<mtime>` (eg. `14:00`) and `<duration>` (eg. `7.9`).  For example, mine looks like `| <date> | <time> | ⏰ Awake | <duration> |` so it formats into a table. Note duration is available for 'Awake' since we can calculate the time between the 'Asleep' and 'Awake' events.
+
+## Support
+
+- If you want to report a bug, it would be best to start an **Issue** on the [GitHub page](https://github.com/jpfieber/jots-sleep-tracker/issues).
+- If you'd like to discuss how the plugin works, the best place would be the [JOTS SubReddit](https://www.reddit.com/r/Jots/)
+
+## JOTS
+
+While this plugin works on it's own in most any vault, it is part of a larger system called <a href="https://jots.life">JOTS: Joe's Obsidian Tracking System</a>. Learn more about it <a href="https://jots.life">here</a>.
+
+![JOTS-Logo-64](https://github.com/user-attachments/assets/e29ba5d7-8bdd-4cd9-8336-5fa35b7b593e)
+
+## Support My Work
+
+If this plugin helped you and you wish to contribute:
+
+<a href="https://www.buymeacoffee.com/jpfieber" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="60"></a>
+
+- <a href="https://github.com/sponsors/jpfieber">GitHub Sponsor</a>
+- <a href="https://www.paypal.com/paypalme/jpfieber">PayPal</a>
+
+Your support helps maintain and improve this project. Thank you!

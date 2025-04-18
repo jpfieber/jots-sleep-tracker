@@ -41,53 +41,65 @@ export class StyleManager {
             return '';
         }
 
-        // Base styles for custom icon
-        const baseStyles = `
-            .HyperMD-task-line[data-task="${settings.stringPrefixLetter}"] {
-                position: relative;
-            }
-
-            .HyperMD-task-line[data-task="${settings.stringPrefixLetter}"] .task-list-item-checkbox {
-                visibility: hidden;
-                position: relative;
-                margin: 0;
-            }
-
-            .HyperMD-task-line[data-task="${settings.stringPrefixLetter}"] .task-list-item-checkbox::before {
-                content: "";
-                position: absolute;
-                left: 0;
-                top: 50%;
-                transform: translateY(-50%);
-                width: 16px;
-                height: 16px;
-                display: block;
-            }`;
-
-        // Icon-specific styles
+        // Icon-specific styles for checkbox
         const iconStyles = this.isEmojiIcon
-            ? `.HyperMD-task-line[data-task="${settings.stringPrefixLetter}"] .task-list-item-checkbox::before {
+            ? `input[data-task="${settings.stringPrefixLetter}"],
+               li[data-task="${settings.stringPrefixLetter}"]>input,
+               li[data-task="${settings.stringPrefixLetter}"]>p>input {
+                --checkbox-marker-color: transparent;
+                background: none !important;
+                border: none !important;
+                padding: 0;
+                width: 1.5em;
+                height: 1.5em;
+                line-height: 1.5em;
+                text-align: center;
+                cursor: pointer;
+                appearance: none;
+                -webkit-appearance: none;
+                position: relative;
+            }
+
+            input[data-task="${settings.stringPrefixLetter}"]::before,
+            li[data-task="${settings.stringPrefixLetter}"]>input::before,
+            li[data-task="${settings.stringPrefixLetter}"]>p>input::before {
                 content: "${this.customIcon}";
                 font-family: "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-                font-size: 14px;
-                line-height: 1;
-                text-align: center;
-                visibility: visible;
+                font-size: 1em;
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: none;
+                -webkit-mask-image: none;
+                mask-image: none;
             }`
-            : `.HyperMD-task-line[data-task="${settings.stringPrefixLetter}"] .task-list-item-checkbox::before {
-                -webkit-mask-image: url('${this.customIcon}');
-                mask-image: url('${this.customIcon}');
-                -webkit-mask-size: contain;
-                mask-size: contain;
-                -webkit-mask-repeat: no-repeat;
-                mask-repeat: no-repeat;
-                -webkit-mask-position: center;
-                mask-position: center;
+            : `input[data-task="${settings.stringPrefixLetter}"],
+               li[data-task="${settings.stringPrefixLetter}"]>input,
+               li[data-task="${settings.stringPrefixLetter}"]>p>input {
+                --checkbox-marker-color: transparent;
+                border: none;
+                border-radius: 0;
+                background-image: none;
                 background-color: currentColor;
-                visibility: visible;
+                pointer-events: none;
+                -webkit-mask-size: contain;
+                -webkit-mask-position: 50% 50%;
+                margin-left: 0;
+                -webkit-mask-image: url("${this.customIcon}");
+                mask-image: url("${this.customIcon}");
             }`;
 
-        return `${baseStyles}\n${iconStyles}`;
+        return `
+            /* Base styles for sleep tracker tasks */
+            .task-list-item[data-task="${settings.stringPrefixLetter}"] {
+                position: relative;
+                margin: 0;
+                padding: 0;
+            }
+
+            ${iconStyles}
+        `;
     }
 
     updateStyles(settings: Settings) {

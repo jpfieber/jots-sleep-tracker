@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this plugin will be documented in this file.
 
+## 1.0.4 (2025-04-18)
+
+- Fixed CSS issue with task icons
+- Added to the ReadMe
+
 ## 1.0.2 (2025-04-18)
 - Initial release
 - Google Fit integration with OAuth2 authentication
