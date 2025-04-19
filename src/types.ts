@@ -31,6 +31,7 @@ export interface Settings {
     journalNameFormat: string;
     asleepEntryTemplate: string;
     awakeEntryTemplate: string;
+    enableJournalEntryCallout: boolean;  // New setting
     stringPrefixLetter: string;
     decoratedTaskSymbol: string;
     taskSvgIcon: string;
@@ -82,6 +83,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
     // Journal settings
     enableJournalEntry: true,
+    enableJournalEntryCallout: false,  // New setting with default value
     journalFolder: 'Journal',
     journalSubDirectory: 'YYYY/YYYY-MM',
     journalNameFormat: 'YYYY-MM-DD_ddd',

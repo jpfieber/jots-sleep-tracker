@@ -419,6 +419,18 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                         this.plugin.settings.taskSvgIcon = value;
                         await this.plugin.saveSettings();
                     }));
+            new Setting(containerEl)
+                .setName('In Callout')
+                .setDesc('Journal Entries will be added to an existing callout')
+                .setClass('jots-sleep-tracker-settings-indent')
+                .addToggle(toggle => toggle
+                    .setValue(this.plugin.settings.enableJournalEntryCallout ?? false)
+                    .onChange(async (value) => {
+                        this.plugin.settings.enableJournalEntryCallout = value;
+                        await this.plugin.saveSettings();
+                    }));
+    
+    
         }
 
         // Sleep Note Settings

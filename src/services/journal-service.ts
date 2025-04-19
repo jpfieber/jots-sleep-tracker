@@ -31,11 +31,13 @@ export class JournalService {
     }
 
     private hasExistingSleepEntry(content: string, date: string, time: string): boolean {
-        const prefix = `- [${this.settings.stringPrefixLetter}]`;
+        const prefix = this.settings.enableJournalEntryCallout 
+            ? `> - [${this.settings.stringPrefixLetter}]`
+            : `- [${this.settings.stringPrefixLetter}]`;
         const lines = content.split('\n');
 
         for (const line of lines) {
-            if (line.startsWith(prefix)) {
+            if (line.includes(prefix)) {
                 const asleepMatch = line.match(/\(asleep::\s*(\d{2}:\d{2})\)/);
                 const awakeMatch = line.match(/\(awake::\s*(\d{2}:\d{2})\)/);
 
@@ -88,17 +90,25 @@ export class JournalService {
             }
         }
 
-        // Check for existing entry
-        if (this.hasExistingSleepEntry(journalContent, date, content)) {
+        // Format content as callout if enabled
+        const formattedContent = this.settings.enableJournalEntryCallout 
+            ? content.split('\n').filter(line => line.trim()).map(line => '> ' + line).join('\n')
+            : content;
+
+        // Extract the time from the content using the existing detection logic
+        const [time] = content.match(/\((?:asleep|awake)::\s*(\d{2}:\d{2})\)/) || [];
+        
+        // Check for existing entry using our more robust detection
+        if (this.hasExistingSleepEntry(journalContent, date, time)) {
             return;
         }
 
         // Simple check - if the exact string already exists, don't add it again
-        if (!journalContent.includes(content.trim())) {
+        if (!journalContent.includes(formattedContent.trim())) {
             // Append the new entry to the file
             const newContent = journalContent.trim() === ''
-                ? content
-                : journalContent.trim() + '\n' + content;
+                ? formattedContent.trim()
+                : journalContent.trim() + '\n' + formattedContent.trim();
 
             // Update the file with retry
             if (file instanceof TFile) {
