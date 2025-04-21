@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this plugin will be documented in this file.
 
+## 1.0.6 (2025-04-21)
+
+- Fixed missing sleep times
+
 ## 1.0.5 (2025-04-18)
 
 - Added ability to nest journal entries in a callout
