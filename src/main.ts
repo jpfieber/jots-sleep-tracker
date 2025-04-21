@@ -228,10 +228,25 @@ export default class SleepTrackerPlugin extends Plugin {
                 const wakeMoment = moment(measurement.endTime * 1000);
                 const sleepDateStr = sleepMoment.format('YYYY-MM-DD');
                 const wakeDateStr = wakeMoment.format('YYYY-MM-DD');
+                const sleepTimeStr = sleepMoment.format('HH:mm');
+                const wakeTimeStr = wakeMoment.format('HH:mm');
 
-                // Add wake events that occur within our target range
-                if (moment(wakeDateStr).isBetween(moment(startDate), moment(endDate), 'day', '[]')) {
-                    const wakeTimeStr = wakeMoment.format('HH:mm');
+                // Add sleep events using sleep date as reference
+                if (!startDate || !endDate || moment(sleepDateStr).isBetween(moment(startDate), moment(endDate), 'day', '[]')) {
+                    events.push({
+                        type: 'sleep',
+                        date: sleepDateStr,
+                        time: sleepTimeStr,
+                        record: {
+                            date: `${sleepDateStr} ${sleepTimeStr}`,
+                            userId: this.settings.defaultUser || this.settings.users[0]?.id || '',
+                            asleepTime: sleepTimeStr
+                        }
+                    });
+                }
+
+                // Add wake events using wake date as reference
+                if (!startDate || !endDate || moment(wakeDateStr).isBetween(moment(startDate), moment(endDate), 'day', '[]')) {
                     events.push({
                         type: 'wake',
                         date: wakeDateStr,
@@ -241,21 +256,6 @@ export default class SleepTrackerPlugin extends Plugin {
                             userId: this.settings.defaultUser || this.settings.users[0]?.id || '',
                             awakeTime: wakeTimeStr,
                             sleepDuration: measurement.sleepDuration?.toFixed(1)
-                        }
-                    });
-                }
-
-                // Add sleep events that occur within our target range
-                if (moment(sleepDateStr).isBetween(moment(startDate), moment(endDate), 'day', '[]')) {
-                    const sleepTimeStr = sleepMoment.format('HH:mm');
-                    events.push({
-                        type: 'sleep',
-                        date: sleepDateStr,
-                        time: sleepTimeStr,
-                        record: {
-                            date: `${sleepDateStr} ${sleepTimeStr}`,
-                            userId: this.settings.defaultUser || this.settings.users[0]?.id || '',
-                            asleepTime: sleepTimeStr
                         }
                     });
                 }
