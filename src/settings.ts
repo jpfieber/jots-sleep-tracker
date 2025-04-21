@@ -429,8 +429,8 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                         this.plugin.settings.enableJournalEntryCallout = value;
                         await this.plugin.saveSettings();
                     }));
-    
-    
+
+
         }
 
         // Sleep Note Settings

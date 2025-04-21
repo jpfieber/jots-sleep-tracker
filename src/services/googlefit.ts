@@ -193,21 +193,40 @@ export class GoogleFitService {
             });
 
             if (!response.ok) {
-                throw new Error('Token refresh failed');
+                const errorData = await response.json().catch(() => ({}));
+                console.error('Failed to refresh token:', errorData);
+
+                // Only clear tokens if we get specific error codes indicating the refresh token is invalid
+                if (response.status === 400 || response.status === 401) {
+                    this.settings.googleAccessToken = '';
+                    this.settings.googleRefreshToken = '';
+                    this.settings.googleTokenExpiry = undefined;
+                    await this.onSettingsChange(this.settings);
+                    throw new Error('Failed to refresh token - please reconnect your account');
+                }
+
+                throw new Error('Failed to refresh token - please try again later');
             }
 
             const data = await response.json();
+            if (!data.access_token) {
+                throw new Error('Invalid response from token endpoint');
+            }
+
             this.settings.googleAccessToken = data.access_token;
             this.settings.googleTokenExpiry = Date.now() + (data.expires_in * 1000);
+            // If we get a new refresh token, update it
+            if (data.refresh_token) {
+                this.settings.googleRefreshToken = data.refresh_token;
+            }
             await this.onSettingsChange(this.settings);
         } catch (error) {
             console.error('Failed to refresh access token:', error);
-            // Clear invalid tokens
-            this.settings.googleAccessToken = '';
-            this.settings.googleRefreshToken = '';
-            this.settings.googleTokenExpiry = undefined;
-            await this.onSettingsChange(this.settings);
-            throw error;
+            // Don't clear tokens for network errors or other temporary issues
+            if (error instanceof Error && error.message.includes('please reconnect')) {
+                throw error;
+            }
+            throw new Error('Failed to refresh token - please try again later');
         }
     }
 
@@ -230,7 +249,7 @@ export class GoogleFitService {
         // If we don't have an access token or it's expired/about to expire, try to refresh
         if (!this.settings.googleAccessToken || (now >= expiryTime - 60000)) {
             if (!this.settings.googleRefreshToken) {
-                // Clear invalid state and request re-authentication
+                // Only clear access token and expiry if refresh token is missing
                 this.settings.googleAccessToken = undefined;
                 this.settings.googleTokenExpiry = undefined;
                 await this.onSettingsChange(this.settings);
@@ -238,43 +257,10 @@ export class GoogleFitService {
             }
 
             try {
-                const response = await request({
-                    url: 'https://oauth2.googleapis.com/token',
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: new URLSearchParams({
-                        client_id: this.clientId,
-                        client_secret: this.clientSecret,
-                        refresh_token: this.settings.googleRefreshToken,
-                        grant_type: 'refresh_token'
-                    }).toString()
-                });
-
-                const tokens = JSON.parse(response);
-                if (!tokens.access_token) {
-                    console.error('Invalid response from Google OAuth server:', tokens);
-                    throw new Error('Invalid response from Google OAuth server');
-                }
-
-                this.settings.googleAccessToken = tokens.access_token;
-                this.settings.googleTokenExpiry = Date.now() + (tokens.expires_in * 1000);
-
-                // If we got a new refresh token, update it
-                if (tokens.refresh_token) {
-                    this.settings.googleRefreshToken = tokens.refresh_token;
-                }
-
-                await this.onSettingsChange(this.settings);
+                await this.refreshAccessToken();
             } catch (error) {
-                console.error('Failed to refresh Google Fit token:', error);
-                // Clear tokens to force re-authentication
-                this.settings.googleAccessToken = undefined;
-                this.settings.googleRefreshToken = undefined;
-                this.settings.googleTokenExpiry = undefined;
-                await this.onSettingsChange(this.settings);
-                throw new Error('Failed to refresh authentication. Please disconnect and reconnect your Google Fit account.');
+                // Let the error from refreshAccessToken propagate up
+                throw error;
             }
         }
     }

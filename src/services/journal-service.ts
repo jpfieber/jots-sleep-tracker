@@ -31,7 +31,7 @@ export class JournalService {
     }
 
     private hasExistingSleepEntry(content: string, date: string, time: string): boolean {
-        const prefix = this.settings.enableJournalEntryCallout 
+        const prefix = this.settings.enableJournalEntryCallout
             ? `> - [${this.settings.stringPrefixLetter}]`
             : `- [${this.settings.stringPrefixLetter}]`;
         const lines = content.split('\n');
@@ -91,13 +91,13 @@ export class JournalService {
         }
 
         // Format content as callout if enabled
-        const formattedContent = this.settings.enableJournalEntryCallout 
+        const formattedContent = this.settings.enableJournalEntryCallout
             ? content.split('\n').filter(line => line.trim()).map(line => '> ' + line).join('\n')
             : content;
 
         // Extract the time from the content using the existing detection logic
         const [time] = content.match(/\((?:asleep|awake)::\s*(\d{2}:\d{2})\)/) || [];
-        
+
         // Check for existing entry using our more robust detection
         if (this.hasExistingSleepEntry(journalContent, date, time)) {
             return;
