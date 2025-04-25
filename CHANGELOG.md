@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this plugin will be documented in this file.
 
+## 1.0.7 (2025-04-25)
+
+- Reset Google Fit state on token refresh failure and notify user
+
 ## 1.0.6 (2025-04-21)
 
 - Fixed missing sleep times
