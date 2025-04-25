@@ -39,11 +39,21 @@ export default class SleepTrackerPlugin extends Plugin {
                     this.setupGoogleFitSync();
                 } catch (error) {
                     console.error('Failed to refresh Google Fit token on load:', error);
-                    // Token refresh failed, but we'll keep the refresh token
-                    // User can try manual reconnect if needed
+                    // Clear all tokens and reset Google Fit state
                     this.settings.googleAccessToken = '';
+                    this.settings.googleRefreshToken = '';
                     this.settings.googleTokenExpiry = undefined;
                     await this.saveSettings();
+
+                    // Reset Google Fit service
+                    this.googleFitService = undefined;
+                    if (this.googleFitSyncInterval) {
+                        window.clearInterval(this.googleFitSyncInterval);
+                        this.googleFitSyncInterval = undefined;
+                    }
+
+                    // Show user-friendly notice
+                    new Notice('Google Fit connection has expired. Please reconnect your account in Sleep Tracker settings.');
                 }
             }
         }
