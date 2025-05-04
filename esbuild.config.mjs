@@ -28,9 +28,9 @@ const buildOptions = {
     },
     entryPoints: ['src/main.ts'],
     bundle: true,
-    external: ['obsidian'],
+    external: ['obsidian', 'node-ical', 'fs'],
     format: 'cjs',
-    target: 'es2016',
+    target: 'es2020',
     logLevel: "info",
     sourcemap: prod ? false : 'inline',
     treeShaking: true,
@@ -38,6 +38,7 @@ const buildOptions = {
     platform: 'browser',
     define: {
         'process.env.NODE_ENV': JSON.stringify(prod ? 'production' : 'development'),
+        'global': 'window',
     }
 };
 

@@ -23,6 +23,24 @@ export interface MeasurementRecord {
     sleepDuration?: string;
 }
 
+export interface SleepData {
+    startTime: number;
+    endTime: number;
+    sleepDuration: number;
+    location?: string;
+    deepSleepPercent?: number;
+    deepSleepMinutes?: number;
+    lightSleepMinutes?: number;
+    remMinutes?: number;
+    awakeMinutes?: number;
+    efficiency?: number;
+    cycles?: number;
+    noisePercent?: number;
+    snoringDuration?: string;
+    comment?: string;
+    graph?: string;
+}
+
 export interface Settings {
     // Journal settings
     enableJournalEntry: boolean;
@@ -42,6 +60,7 @@ export interface Settings {
     sleepNotePath: string;
     asleepNoteTemplate: string;
     awakeNoteTemplate: string;
+    sleepNotesFolder: string;
 
     // Measurement file settings
     enableMeasurementFiles: boolean;
@@ -68,6 +87,10 @@ export interface Settings {
     lastSyncSleepNoteEnabled: boolean;
     lastSyncStartDate?: string;
     lastSyncEndDate?: string;
+
+    // Calendar integration settings
+    calendarUrl?: string;
+    useCalendarForSleepNotes: boolean;
 
     // Google Fit integration settings
     enableGoogleFit: boolean;
@@ -98,6 +121,7 @@ export const DEFAULT_SETTINGS: Settings = {
     sleepNotePath: 'Sleep/sleep-tracking.md',
     asleepNoteTemplate: '| <date> | <time> (<mtime>) | 💤 Asleep | |',
     awakeNoteTemplate: '| <date> | <time> (<mtime>) | ⏰ Awake | <duration> |',
+    sleepNotesFolder: 'Stacks/Sleep',
 
     enableMeasurementFiles: true,
     measurementFolder: 'Sleep',
@@ -137,6 +161,10 @@ export const DEFAULT_SETTINGS: Settings = {
     lastSyncSleepNoteEnabled: false,
     lastSyncStartDate: undefined,
     lastSyncEndDate: undefined,
+
+    // Calendar integration settings
+    calendarUrl: 'https://calendar.google.com/calendar/ical/47871a9405310639ad56ab2c42c8230227232bda03838db99458b32ae2cdbdaa%40group.calendar.google.com/private-fd2c6c754cdfa28b0197606c03bf7abe/basic.ics',
+    useCalendarForSleepNotes: false,
 
     // Google Fit defaults
     enableGoogleFit: false,

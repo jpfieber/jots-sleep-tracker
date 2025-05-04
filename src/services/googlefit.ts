@@ -1,5 +1,5 @@
 import { request, Notice, App } from 'obsidian';
-import type { Settings } from '../types';
+import type { Settings, SleepData } from '../types';
 import { OAuthCallbackServer } from './oauth-server';
 
 interface GoogleFitAuthConfig {
@@ -22,16 +22,6 @@ interface GoogleFitSleepSession {
         startTimeMillis: number;
         endTimeMillis: number;
     }>;
-}
-
-interface GoogleFitSleepMeasurement {
-    startTime: number;  // Unix timestamp in seconds
-    endTime: number;    // Unix timestamp in seconds
-    sleepDuration?: number;
-    deepSleep?: number;
-    lightSleep?: number;
-    remSleep?: number;
-    sleepQuality?: number;
 }
 
 interface GoogleFitServiceConfig extends GoogleFitAuthConfig {
@@ -273,7 +263,7 @@ export class GoogleFitService {
         };
     }
 
-    async getSleepMeasurements(startTime: number, endTime: number): Promise<GoogleFitSleepMeasurement[]> {
+    async getSleepMeasurements(startTime: number, endTime: number): Promise<SleepData[]> {
         await this.rateLimit();
         await this.refreshTokenIfNeeded();
 
@@ -288,52 +278,111 @@ export class GoogleFitService {
                 }
             });
 
+            console.log('Raw sleep sessions response:', sleepResponse);
             const sleepData = JSON.parse(sleepResponse);
-            const measurements: GoogleFitSleepMeasurement[] = [];
+            const measurements: SleepData[] = [];
 
             if (sleepData.session) {
                 for (const session of sleepData.session) {
+                    console.log('Processing session:', session);
+
                     // Convert milliseconds to seconds
                     const startTimeSeconds = Math.floor(session.startTimeMillis / 1000);
                     const endTimeSeconds = Math.floor(session.endTimeMillis / 1000);
                     const duration = (session.endTimeMillis - session.startTimeMillis) / (1000 * 60 * 60); // Convert to hours
 
-                    measurements.push({
+                    const measurement: SleepData = {
                         startTime: startTimeSeconds,
                         endTime: endTimeSeconds,
-                        sleepDuration: duration,
-                        sleepQuality: session.sleepQuality || undefined
-                    });
+                        sleepDuration: duration
+                    };
 
-                    // Get detailed sleep stages if available
-                    if (session.sleepSegments) {
-                        let deepSleep = 0;
-                        let lightSleep = 0;
-                        let remSleep = 0;
+                    // Fetch detailed sleep stage data for this session
+                    try {
+                        const stagesResponse = await request({
+                            url: `https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate`,
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${this.settings.googleAccessToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                aggregateBy: [{
+                                    dataTypeName: "com.google.sleep.segment"
+                                }],
+                                startTimeMillis: session.startTimeMillis,
+                                endTimeMillis: session.endTimeMillis,
+                            })
+                        });
 
-                        for (const segment of session.sleepSegments) {
-                            const duration = (segment.endTimeMillis - segment.startTimeMillis) / (1000 * 60 * 60);
-                            switch (segment.sleepStage) {
-                                case 'deep':
-                                    deepSleep += duration;
-                                    break;
-                                case 'light':
-                                    lightSleep += duration;
-                                    break;
-                                case 'rem':
-                                    remSleep += duration;
-                                    break;
+                        console.log('Sleep stages response:', stagesResponse);
+                        const stagesData = JSON.parse(stagesResponse);
+
+                        if (stagesData.bucket && stagesData.bucket[0]?.dataset) {
+                            let deepSleepMinutes = 0;
+                            let lightSleepMinutes = 0;
+                            let remSleepMinutes = 0;
+                            let awakeMinutes = 0;
+
+                            for (const dataset of stagesData.bucket[0].dataset) {
+                                if (dataset.point) {
+                                    for (const point of dataset.point) {
+                                        // Calculate segment duration in minutes
+                                        const durationMinutes =
+                                            (parseInt(point.endTimeNanos) - parseInt(point.startTimeNanos)) /
+                                            (1000 * 1000 * 1000 * 60); // Convert nanos to minutes
+
+                                        // Sleep stage values from Google Fit API
+                                        // 4: REM sleep
+                                        // 5: Light sleep
+                                        // 6: Deep sleep
+                                        switch (point.value[0].intVal) {
+                                            case 5:
+                                                lightSleepMinutes += durationMinutes;
+                                                break;
+                                            case 6:
+                                                deepSleepMinutes += durationMinutes;
+                                                break;
+                                            case 4:
+                                                remSleepMinutes += durationMinutes;
+                                                break;
+                                            case 1:
+                                                awakeMinutes += durationMinutes;
+                                                break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Round to whole minutes
+                            measurement.deepSleepMinutes = Math.round(deepSleepMinutes);
+                            measurement.lightSleepMinutes = Math.round(lightSleepMinutes);
+                            measurement.remMinutes = Math.round(remSleepMinutes);
+                            measurement.awakeMinutes = Math.round(awakeMinutes);
+
+                            // Calculate sleep efficiency as total sleep time / total time
+                            const totalMinutes = deepSleepMinutes + lightSleepMinutes + remSleepMinutes + awakeMinutes;
+                            if (totalMinutes > 0) {
+                                const sleepMinutes = deepSleepMinutes + lightSleepMinutes + remSleepMinutes;
+                                measurement.efficiency = sleepMinutes / totalMinutes;
+                            }
+
+                            // Calculate deep sleep percentage for consistency with Sleep as Android calendar data
+                            const sleepMinutes = deepSleepMinutes + lightSleepMinutes + remSleepMinutes;
+                            if (sleepMinutes > 0) {
+                                measurement.deepSleepPercent = (deepSleepMinutes / sleepMinutes) * 100;
                             }
                         }
-
-                        const measurement = measurements[measurements.length - 1];
-                        measurement.deepSleep = deepSleep;
-                        measurement.lightSleep = lightSleep;
-                        measurement.remSleep = remSleep;
+                    } catch (error) {
+                        console.error('Failed to fetch sleep stages:', error);
+                        // Continue without sleep stage data
                     }
+
+                    measurements.push(measurement);
                 }
             }
 
+            console.log('Final measurements:', measurements);
             return measurements;
         } catch (error) {
             console.error('Failed to fetch Google Fit sleep data:', error);
@@ -384,9 +433,9 @@ export class GoogleFitService {
                 body: JSON.stringify(session)
             });
 
-            new Notice('Sleep session added to Google Fit');
+            console.log('Sleep session added:', response);
         } catch (error) {
-            console.error('Failed to add Google Fit sleep session:', error);
+            console.error('Failed to add sleep session:', error);
             throw error;
         }
     }

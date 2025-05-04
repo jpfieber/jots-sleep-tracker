@@ -4,8 +4,9 @@ import { SleepTrackerSettingsTab } from './settings';
 import { MeasurementService } from './services/measurement-service';
 import { JournalService } from './services/journal-service';
 import { GoogleFitService } from './services/googlefit';
+import { CalendarService } from './services/calendar-service';
 import { StyleManager } from './services/style-manager';
-import { MeasurementType, Settings, DEFAULT_SETTINGS, MeasurementRecord } from './types';
+import { MeasurementType, Settings, DEFAULT_SETTINGS, MeasurementRecord, SleepData } from './types';
 
 export default class SleepTrackerPlugin extends Plugin {
     settings!: Settings;
@@ -67,6 +68,15 @@ export default class SleepTrackerPlugin extends Plugin {
             name: 'Add Sleep Record Manually',
             callback: () => {
                 new MeasurementModal(this.app, this).open();
+            }
+        });
+
+        // Add command for generating sleep note
+        this.addCommand({
+            id: 'generate-sleep-note',
+            name: 'Generate Sleep Note',
+            callback: async () => {
+                await this.generateSleepNote();
             }
         });
 
@@ -324,6 +334,117 @@ export default class SleepTrackerPlugin extends Plugin {
         // Add to sleep note
         if (this.settings.enableSleepNote) {
             await this.journalService.appendToSleepNote(data);
+        }
+    }
+
+    async generateSleepNote() {
+        try {
+            let sleepData: SleepData;
+            const moment = (window as any).moment;
+
+            if (this.settings.useCalendarForSleepNotes && this.settings.calendarUrl) {
+                const calendarService = new CalendarService(this.settings.calendarUrl);
+                const calendarData = await calendarService.getLatestSleepData();
+                if (!calendarData) {
+                    new Notice('No sleep data found in calendar');
+                    return;
+                }
+                sleepData = calendarData;
+            } else if (this.googleFitService && this.settings.googleAccessToken) {
+                const now = moment();
+                const startTime = now.subtract(1, 'day').startOf('day').valueOf() / 1000;
+                const endTime = now.endOf('day').valueOf() / 1000;
+
+                const sleepMeasurements = await this.googleFitService.getSleepMeasurements(startTime, endTime);
+                if (!sleepMeasurements || sleepMeasurements.length === 0) {
+                    new Notice('No sleep data found for the last 24 hours');
+                    return;
+                }
+                sleepData = sleepMeasurements[sleepMeasurements.length - 1];
+            } else {
+                new Notice('Please configure either Google Fit or Calendar integration');
+                return;
+            }
+
+            const sleepMoment = moment(sleepData.startTime * 1000);
+            const wakeMoment = moment(sleepData.endTime * 1000);
+            const date = sleepMoment.format('YYYY-MM-DD');
+
+            // Create the note path using the same folder structure as events
+            const year = sleepMoment.format('YYYY');
+            const yearMonth = sleepMoment.format('YYYY-MM');
+            const notePath = `${this.settings.sleepNotesFolder}/${year}/${yearMonth}/${date}_Sleep.md`;
+
+            // Ensure the folder structure exists
+            await this.createFolderStructure(`${this.settings.sleepNotesFolder}/${year}/${yearMonth}`);
+
+            // Format duration as HH:mm
+            const durationHours = Math.floor(sleepData.sleepDuration);
+            const durationMinutes = Math.round((sleepData.sleepDuration - durationHours) * 60);
+            const durationFormatted = `${durationHours}h ${durationMinutes}m`;
+
+            // Calculate sleep stage totals
+            const totalSleepMinutes = (sleepData.deepSleepMinutes || 0) + (sleepData.lightSleepMinutes || 0) + (sleepData.remMinutes || 0);
+            const hasDetailedSleepStages = totalSleepMinutes > 0;
+
+            // Create the note content
+            const noteContent = `---
+type: sleep
+title: Sleep Record ${date}
+date: ${date}
+startTime: ${sleepMoment.format('HH:mm')}
+endTime: ${wakeMoment.format('HH:mm')}
+duration: ${durationFormatted}
+location: ${sleepData.location || 'N/A'}
+deepSleep: ${sleepData.deepSleepPercent !== undefined ? `${sleepData.deepSleepPercent.toFixed(1)}%` : 'N/A'}
+cycles: ${sleepData.cycles || 'N/A'}
+efficiency: ${sleepData.efficiency !== undefined ? `${(sleepData.efficiency * 100).toFixed(1)}%` : 'N/A'}
+noise: ${sleepData.noisePercent !== undefined ? `${sleepData.noisePercent.toFixed(1)}%` : 'N/A'}
+created: ${moment().format('YYYY-MM-DDTHH:mm:ssZ')}
+---
+# Sleep Record for ${date}
+
+## Sleep Times
+▶️ Went to bed at ${sleepMoment.format('HH:mm')} on ${sleepMoment.format('dddd, MMMM D')}
+⏰ Woke up at ${wakeMoment.format('HH:mm')} on ${wakeMoment.format('dddd, MMMM D')}
+⏱️ Total time in bed: ${durationFormatted}
+
+## Sleep Analysis${hasDetailedSleepStages ? `
+
+**Sleep Stages:**
+${sleepData.deepSleepMinutes ? `🌑 Deep Sleep:  ${sleepData.deepSleepPercent?.toFixed(1)}% (${sleepData.deepSleepMinutes}m)` : ''}
+${sleepData.lightSleepMinutes ? `🌓 Light Sleep: ${(100 - (sleepData.deepSleepPercent || 0)).toFixed(1)}% (${sleepData.lightSleepMinutes}m)` : ''}
+${sleepData.remMinutes ? `🌙 REM Sleep:   ${((sleepData.remMinutes / totalSleepMinutes) * 100).toFixed(1)}% (${sleepData.remMinutes}m)` : ''}` : '\nNo detailed sleep stage data available.'}
+
+**Sleep Quality:**
+${sleepData.efficiency !== undefined ? `📊 Sleep Efficiency: ${(sleepData.efficiency * 100).toFixed(1)}%` : ''}
+${sleepData.cycles ? `🔄 Sleep Cycles: ${sleepData.cycles}` : ''}
+${sleepData.awakeMinutes ? `⚡ Time Awake: ${sleepData.awakeMinutes} minutes` : ''}
+${sleepData.noisePercent !== undefined ? `🔊 Noise Level: ${sleepData.noisePercent.toFixed(1)}%` : ''}
+${sleepData.snoringDuration ? `😴 Snoring: ${sleepData.snoringDuration}` : ''}${sleepData.location ? `\n📍 Location: ${sleepData.location}` : ''}
+
+${sleepData.graph ? `## Sleep Graph
+\`\`\`
+${sleepData.graph}
+\`\`\`` : ''}${sleepData.comment ? `\n## Notes\n${sleepData.comment}` : ''}`;
+
+            const file = await this.app.vault.create(notePath, noteContent);
+            new Notice(`Created sleep note: ${notePath}`);
+        } catch (error) {
+            console.error('Failed to generate sleep note:', error);
+            new Notice('Failed to generate sleep note. Check the console for details.');
+        }
+    }
+
+    private async createFolderStructure(folderPath: string) {
+        const parts = folderPath.split('/');
+        let currentPath = '';
+        for (const part of parts) {
+            currentPath = currentPath ? `${currentPath}/${part}` : part;
+            const folder = this.app.vault.getAbstractFileByPath(currentPath);
+            if (!folder) {
+                await this.app.vault.createFolder(currentPath);
+            }
         }
     }
 

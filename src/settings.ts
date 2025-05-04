@@ -38,6 +38,32 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
+        // Calendar Integration Settings
+        new Setting(containerEl)
+            .setName('Use Calendar for Sleep Notes')
+            .setDesc('Use Sleep as Android calendar events instead of Google Fit for sleep note generation')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.useCalendarForSleepNotes)
+                .onChange(async (value) => {
+                    this.plugin.settings.useCalendarForSleepNotes = value;
+                    await this.plugin.saveSettings();
+                    this.display();
+                }));
+
+        if (this.plugin.settings.useCalendarForSleepNotes) {
+            new Setting(containerEl)
+                .setName('Calendar URL')
+                .setDesc('The secret iCal URL from your Google Calendar')
+                .setClass('jots-sleep-tracker-settings-indent')
+                .addText(text => text
+                    .setPlaceholder('https://calendar.google.com/calendar/ical/...')
+                    .setValue(this.plugin.settings.calendarUrl || '')
+                    .onChange(async (value) => {
+                        this.plugin.settings.calendarUrl = value;
+                        await this.plugin.saveSettings();
+                    }));
+        }
+
         // Google Fit Integration Settings
         new Setting(containerEl)
             .setName('Enable Google Fit Integration')
@@ -481,6 +507,17 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                     .setValue(this.plugin.settings.awakeNoteTemplate)
                     .onChange(async (value) => {
                         this.plugin.settings.awakeNoteTemplate = value;
+                        await this.plugin.saveSettings();
+                    }));
+
+            new Setting(containerEl)
+                .setName('Sleep Notes Folder')
+                .setDesc('The folder where individual sleep note files will be stored.')
+                .addText(text => text
+                    .setPlaceholder('Stacks/Sleep')
+                    .setValue(this.plugin.settings.sleepNotesFolder)
+                    .onChange(async (value) => {
+                        this.plugin.settings.sleepNotesFolder = value;
                         await this.plugin.saveSettings();
                     }));
         }
