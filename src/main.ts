@@ -74,7 +74,7 @@ export default class SleepTrackerPlugin extends Plugin {
         // Add command for generating sleep note
         this.addCommand({
             id: 'generate-sleep-note',
-            name: 'Generate Sleep Note',
+            name: 'Generate Sleep Event Note',
             callback: async () => {
                 await this.generateSleepNote();
             }
@@ -183,17 +183,13 @@ export default class SleepTrackerPlugin extends Plugin {
         // Set up new sync interval if enabled
         if (this.settings.enableGoogleFit && this.settings.googleAutoSyncInterval > 0) {
             this.googleFitSyncInterval = window.setInterval(
-                () => this.syncGoogleFit(),
+                () => this.syncSleepData(),
                 this.settings.googleAutoSyncInterval * 60 * 1000 // Convert minutes to milliseconds
             );
         }
     }
 
-    async syncGoogleFit(startDate?: string, endDate?: string, progressCallback?: (current: number, total: number) => void, tempSettings?: { enableJournalEntry?: boolean, enableSleepNote?: boolean }) {
-        if (!this.googleFitService || !this.settings.googleAccessToken) {
-            return;
-        }
-
+    async syncSleepData(startDate?: string, endDate?: string, progressCallback?: (current: number, total: number) => void, tempSettings?: { enableJournalEntry?: boolean, enableSleepNote?: boolean }) {
         // Store original settings
         const originalJournalSetting = this.settings.enableJournalEntry;
         const originalSleepNoteSetting = this.settings.enableSleepNote;
@@ -232,7 +228,27 @@ export default class SleepTrackerPlugin extends Plugin {
             ) / (24 * 60 * 60 * 1000));
             const processedDays = new Set<string>();
 
-            const sleepMeasurements = await this.googleFitService.getSleepMeasurements(startTime, endTime);
+            let sleepMeasurements: SleepData[] = [];
+
+            // Try to get data from calendar first if configured
+            if (this.settings.useCalendarForSleepNotes && this.settings.calendarUrl) {
+                const calendarService = new CalendarService(this.settings.calendarUrl);
+                try {
+                    sleepMeasurements = await calendarService.getSleepDataForDateRange(startTime, endTime);
+                } catch (error) {
+                    console.error('Failed to get calendar sleep data:', error);
+                    new Notice('Failed to get calendar sleep data, falling back to Google Fit');
+                }
+            }
+
+            // Fall back to Google Fit if calendar failed or wasn't configured
+            if (sleepMeasurements.length === 0 && this.googleFitService && this.settings.googleAccessToken) {
+                sleepMeasurements = await this.googleFitService.getSleepMeasurements(startTime, endTime);
+            }
+
+            if (sleepMeasurements.length === 0) {
+                throw new Error('No sleep data found from any source');
+            }
 
             // Create arrays to hold sleep and wake events
             type SleepEvent = {
@@ -308,9 +324,9 @@ export default class SleepTrackerPlugin extends Plugin {
                 : 'from the last 7 days';
             new Notice(`Successfully synced sleep data ${dateRangeStr}`);
         } catch (error) {
-            console.error('Failed to sync with Google Fit:', error);
+            console.error('Failed to sync sleep data:', error);
             if (error instanceof Error && error.message !== 'Sync cancelled') {
-                new Notice('Failed to sync with Google Fit. Check the console for details.');
+                new Notice('Failed to sync sleep data. Check the console for details.');
             }
             throw error;
         } finally {
@@ -339,31 +355,35 @@ export default class SleepTrackerPlugin extends Plugin {
 
     async generateSleepNote() {
         try {
-            let sleepData: SleepData;
+            let sleepData: SleepData | null = null;
             const moment = (window as any).moment;
 
+            // Try calendar first if configured
             if (this.settings.useCalendarForSleepNotes && this.settings.calendarUrl) {
                 const calendarService = new CalendarService(this.settings.calendarUrl);
-                const calendarData = await calendarService.getLatestSleepData();
-                if (!calendarData) {
-                    new Notice('No sleep data found in calendar');
-                    return;
+                try {
+                    sleepData = await calendarService.getLatestSleepData();
+                } catch (error) {
+                    console.error('Failed to get calendar sleep data:', error);
+                    new Notice('Failed to get calendar sleep data, falling back to Google Fit');
                 }
-                sleepData = calendarData;
-            } else if (this.googleFitService && this.settings.googleAccessToken) {
+            }
+
+            // Fall back to Google Fit if calendar failed or wasn't configured
+            if (!sleepData && this.googleFitService && this.settings.googleAccessToken) {
                 const now = moment();
                 const startTime = now.subtract(1, 'day').startOf('day').valueOf() / 1000;
                 const endTime = now.endOf('day').valueOf() / 1000;
 
                 const sleepMeasurements = await this.googleFitService.getSleepMeasurements(startTime, endTime);
                 if (!sleepMeasurements || sleepMeasurements.length === 0) {
-                    new Notice('No sleep data found for the last 24 hours');
-                    return;
+                    throw new Error('No sleep data found for the last 24 hours');
                 }
                 sleepData = sleepMeasurements[sleepMeasurements.length - 1];
-            } else {
-                new Notice('Please configure either Google Fit or Calendar integration');
-                return;
+            } 
+
+            if (!sleepData) {
+                throw new Error('No sleep data found from any source');
             }
 
             const sleepMoment = moment(sleepData.startTime * 1000);
@@ -378,10 +398,11 @@ export default class SleepTrackerPlugin extends Plugin {
             // Ensure the folder structure exists
             await this.createFolderStructure(`${this.settings.sleepNotesFolder}/${year}/${yearMonth}`);
 
-            // Format duration as HH:mm
+            // Format duration for YAML and note body
             const durationHours = Math.floor(sleepData.sleepDuration);
             const durationMinutes = Math.round((sleepData.sleepDuration - durationHours) * 60);
             const durationFormatted = `${durationHours}h ${durationMinutes}m`;
+            const durationYAML = `${durationHours}:${durationMinutes.toString().padStart(2, '0')}`;
 
             // Calculate sleep stage totals
             const totalSleepMinutes = (sleepData.deepSleepMinutes || 0) + (sleepData.lightSleepMinutes || 0) + (sleepData.remMinutes || 0);
@@ -392,14 +413,14 @@ export default class SleepTrackerPlugin extends Plugin {
 type: sleep
 title: Sleep Record ${date}
 date: ${date}
-startTime: ${sleepMoment.format('HH:mm')}
-endTime: ${wakeMoment.format('HH:mm')}
-duration: ${durationFormatted}
-location: ${sleepData.location || 'N/A'}
-deepSleep: ${sleepData.deepSleepPercent !== undefined ? `${sleepData.deepSleepPercent.toFixed(1)}%` : 'N/A'}
-cycles: ${sleepData.cycles || 'N/A'}
-efficiency: ${sleepData.efficiency !== undefined ? `${(sleepData.efficiency * 100).toFixed(1)}%` : 'N/A'}
-noise: ${sleepData.noisePercent !== undefined ? `${sleepData.noisePercent.toFixed(1)}%` : 'N/A'}
+sleepStartTime: ${sleepMoment.format('HH:mm')}
+sleepEndTime: ${wakeMoment.format('HH:mm')}
+sleepDuration: ${durationYAML}
+sleepLocation: ${sleepData.location || 'N/A'}
+sleepDeepPercent: ${sleepData.deepSleepPercent !== undefined ? sleepData.deepSleepPercent.toFixed(1) : 'N/A'}
+sleepCycles: ${sleepData.cycles || 'N/A'}
+sleepEfficiency: ${sleepData.efficiency !== undefined ? (sleepData.efficiency * 100).toFixed(1) : 'N/A'}
+sleepNoiseLevel: ${sleepData.noisePercent !== undefined ? sleepData.noisePercent.toFixed(1) : 'N/A'}
 created: ${moment().format('YYYY-MM-DDTHH:mm:ssZ')}
 ---
 # Sleep Record for ${date}
@@ -471,19 +492,18 @@ ${sleepData.graph}
         });
 
         this.addCommand({
-            id: 'sync-google-fit',
-            name: 'Add Sleep Records via Google Fit',
+            id: 'sync-sleep-data',
+            name: 'Add Sleep Records Automatically',
             checkCallback: (checking: boolean): boolean => {
                 const canRun: boolean = !!(
-                    this.settings.enableGoogleFit
-                    && this.settings.googleAccessToken
-                    && this.googleFitService
+                    (this.settings.useCalendarForSleepNotes && this.settings.calendarUrl) ||
+                    (this.settings.enableGoogleFit && this.settings.googleAccessToken)
                 );
 
                 if (checking) return canRun;
 
                 if (canRun) {
-                    this.syncGoogleFit();
+                    this.syncSleepData();
                 }
 
                 return canRun;

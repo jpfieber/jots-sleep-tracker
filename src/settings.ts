@@ -41,7 +41,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
         // Calendar Integration Settings
         new Setting(containerEl)
             .setName('Use Calendar for Sleep Notes')
-            .setDesc('Use Sleep as Android calendar events instead of Google Fit for sleep note generation')
+            .setDesc('Use Sleep as Android calendar events as the primary source for sleep data')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.useCalendarForSleepNotes)
                 .onChange(async (value) => {
@@ -67,7 +67,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
         // Google Fit Integration Settings
         new Setting(containerEl)
             .setName('Enable Google Fit Integration')
-            .setDesc('Sync sleep data from your Google Fit account')
+            .setDesc('Use Google Fit as a fallback source for sleep data')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.enableGoogleFit ?? false)
                 .onChange(async (value) => {
@@ -149,7 +149,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                 // Manual sync section now as a subsection
                 const manualSyncHeader = containerEl.createEl('div', { cls: 'jots-sleep-tracker-settings-indent' });
                 manualSyncHeader.createEl('h4', { text: 'Manual Data Sync' });
-                manualSyncHeader.createEl('p', { text: 'Useful for retrieving old data when you first start using the plugin, or grabbing data you missed if you haven\'t used Obsidian in over a week.' });
+                manualSyncHeader.createEl('p', { text: 'Sync sleep data from your calendar or Google Fit. Calendar data will be used if available, falling back to Google Fit if needed.' });
 
                 const syncDiv = manualSyncHeader.createDiv({ cls: 'jots-sleep-tracker-sync-controls' });
                 const dateInputsDiv = syncDiv.createDiv({ cls: 'jots-sleep-tracker-date-inputs' });
@@ -253,7 +253,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                     text: 'Sync Date Range',
                     cls: 'mod-cta'
                 });
-                syncRangeButton.disabled = !this.plugin.settings.googleAccessToken;
+                syncRangeButton.disabled = !(this.plugin.settings.googleAccessToken || (this.plugin.settings.useCalendarForSleepNotes && this.plugin.settings.calendarUrl));
 
                 let currentAbortController: AbortController | null = null;
 
@@ -274,7 +274,7 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                     };
 
                     try {
-                        await this.plugin.syncGoogleFit(startDate, endDate, (current, total) => {
+                        await this.plugin.syncSleepData(startDate, endDate, (current, total) => {
                             if (currentAbortController?.signal.aborted) {
                                 throw new Error('Sync cancelled');
                             }
@@ -303,7 +303,11 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                         }, 3000);
                     } finally {
                         currentAbortController = null;
-                        syncRangeButton.disabled = !this.plugin.settings.googleAccessToken;
+                        // Update button state to enable if either calendar or Google Fit is available
+                        syncRangeButton.disabled = !(
+                            (this.plugin.settings.useCalendarForSleepNotes && this.plugin.settings.calendarUrl) ||
+                            (this.plugin.settings.enableGoogleFit && this.plugin.settings.googleAccessToken)
+                        );
                         syncRangeButton.style.opacity = '1';
                     }
                 };
@@ -327,6 +331,13 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                         new Notice('Start date must be before or equal to end date');
                         return;
                     }
+
+                    // Store sync settings in plugin settings
+                    this.plugin.settings.lastSyncStartDate = startDate;
+                    this.plugin.settings.lastSyncEndDate = endDate;
+                    this.plugin.settings.lastSyncJournalEnabled = journalCheck.checked;
+                    this.plugin.settings.lastSyncSleepNoteEnabled = sleepNoteCheck.checked;
+                    await this.plugin.saveSettings();
 
                     await startSync(startDate, endDate);
                 };

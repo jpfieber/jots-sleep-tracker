@@ -44,6 +44,43 @@ export class CalendarService {
         }
     }
 
+    async getSleepDataForDateRange(startTime: number, endTime: number): Promise<SleepData[]> {
+        try {
+            const response = await request({
+                url: this.calendarUrl,
+                method: 'GET'
+            });
+
+            const jcalData = ICAL.parse(response);
+            const comp = new ICAL.Component(jcalData);
+            const vevents = comp.getAllSubcomponents('vevent');
+            const sleepData: SleepData[] = [];
+
+            // Find all Sleep as Android events within the date range
+            for (const vevent of vevents) {
+                const event = new ICAL.Event(vevent);
+                if (!event.summary?.includes('Sleep as Android')) continue;
+
+                const eventStartTime = Math.floor(event.startDate.toJSDate().getTime() / 1000);
+                const eventEndTime = Math.floor(event.endDate.toJSDate().getTime() / 1000);
+
+                // Check if event falls within our date range
+                if (eventStartTime >= startTime && eventEndTime <= endTime) {
+                    const description = event.description || '';
+                    const location = event.component.getFirstPropertyValue('location') || '';
+                    const data = this.parseSleepData(event, description, location);
+                    sleepData.push(data);
+                }
+            }
+
+            return sleepData;
+
+        } catch (error) {
+            console.error('Failed to fetch calendar data:', error);
+            throw error;
+        }
+    }
+
     private parseSleepData(event: ICAL.Event, description: string, location: string): SleepData {
         const startTime = event.startDate.toJSDate().getTime();
         const endTime = event.endDate.toJSDate().getTime();
