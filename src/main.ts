@@ -83,6 +83,141 @@ export default class SleepTrackerPlugin extends Plugin {
 
         // Add Google Fit commands
         this.addCommands();
+
+        // Register markdown processor for sleep charts
+        this.registerMarkdownPostProcessor((element, context) => {
+            const charts = element.querySelectorAll('canvas[id="sleepChart"]');
+            charts.forEach((canvas, index) => {
+                // Skip if chart is already initialized
+                if ((canvas as any).__chartInitialized) return;
+
+                // Get the script element that follows the canvas
+                const script = canvas.parentElement?.querySelector('script');
+                if (!script) return;
+
+                try {
+                    // Create a temporary function to capture the local Chart variable
+                    const initChart = new Function('Chart', 'canvas', script.textContent || '');
+                    initChart(Chart, canvas);
+                    
+                    // Mark as initialized to prevent duplicate charts
+                    (canvas as any).__chartInitialized = true;
+                } catch (error) {
+                    console.error('Failed to initialize sleep chart:', error);
+                }
+            });
+        });
+
+        // Register processor for sleep chart codeblocks
+        this.registerMarkdownCodeBlockProcessor("jots-sleep-tracker", (source, el, ctx) => {
+            const lines = source.split('\n');
+            let startTime = '';
+            let endTime = '';
+            let data = '';
+            
+            // Parse the block content
+            lines.forEach(line => {
+                const [key, value] = line.split('=').map(s => s.trim());
+                switch (key) {
+                    case 'startTime':
+                        startTime = value;
+                        break;
+                    case 'endTime':
+                        endTime = value;
+                        break;
+                    case 'data':
+                        data = value;
+                        break;
+                }
+            });
+
+            if (!startTime || !endTime || !data) {
+                el.createEl('p', { text: 'Error: Missing required fields in sleep chart block' });
+                return;
+            }
+
+            // Create container and canvas
+            const container = el.createDiv({ 
+                cls: 'jots-sleep-tracker-chart',
+                attr: { style: 'position: relative; height: 400px; width: 100%; margin: 20px 0;' }
+            });
+            const canvas = container.createEl('canvas');
+            const canvasCtx = canvas.getContext('2d');
+            if (!canvasCtx) {
+                console.error('Failed to get canvas context');
+                return;
+            }
+
+            // Calculate time labels
+            const moment = (window as any).moment;
+            const startMoment = moment(startTime, 'HH:mm');
+            const endMoment = moment(endTime, 'HH:mm');
+            if (endMoment.isBefore(startMoment)) {
+                endMoment.add(1, 'day');
+            }
+            const duration = moment.duration(endMoment.diff(startMoment));
+            const minutesPerPoint = duration.asMinutes() / data.length;
+
+            const labels = Array.from({ length: data.length }, (_, i) => {
+                return moment(startMoment).add(i * minutesPerPoint, 'minutes').format('HH:mm');
+            });
+
+            // Convert sleep depth data
+            const chartData = data.split('').map(char => {
+                switch (char) {
+                    case '▁': return 1;
+                    case '▂': return 2;
+                    case '▃': return 3;
+                    case '▄': return 4;
+                    case '▅': return 5;
+                    case '▆': return 6;
+                    case '▇': return 7;
+                    case '█': return 8;
+                    default: return 0;
+                }
+            });
+
+            // Create the chart
+            new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Sleep Depth',
+                        data: chartData,
+                        fill: true,
+                        borderColor: 'rgb(127, 82, 255)',
+                        backgroundColor: 'rgba(127, 82, 255, 0.2)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 8,
+                            title: {
+                                display: true,
+                                text: 'Sleep Depth'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Sleep Pattern'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        });
     }
 
     onunload() {
@@ -448,34 +583,10 @@ ${sleepData.snoringDuration ? `😴 Snoring: ${sleepData.snoringDuration}` : ''}
 
 ${sleepData.graph ? `## Sleep Pattern
 
-\`\`\`chart
-type: line
-labels: [${Array.from({ length: 24 }, (_, i) => {
-                const time = moment(sleepData.startTime * 1000).add(i * (sleepData.sleepDuration * 60 / 24), 'minutes');
-                return `"${time.format('HH:mm')}"`;
-            }).join(',')}]
-series:
-  - title: Sleep Depth
-    data: [${sleepData.graph.split('').map(char => {
-                switch (char) {
-                    case '▁': return '1';
-                    case '▂': return '2';
-                    case '▃': return '3';
-                    case '▄': return '4';
-                    case '▅': return '5';
-                    case '▆': return '6';
-                    case '▇': return '7';
-                    case '█': return '8';
-                    default: return '0';
-                }
-            }).join(',')}]
-tension: 0.4
-fill: true
-legend: false
-xTitle: Sleep Pattern
-yTitle: Sleep Depth
-beginAtZero: true
-yMax: 8
+\`\`\`jots-sleep-tracker
+startTime = ${sleepMoment.format('HH:mm')}
+endTime = ${wakeMoment.format('HH:mm')}
+data = ${sleepData.graph}
 \`\`\`` : ''}${sleepData.comment ? `\n\n` : ''}`;
 
             const file = await this.app.vault.create(notePath, noteContent);
