@@ -28,6 +28,7 @@ export interface SleepData {
     endTime: number;
     sleepDuration: number;
     location?: string;
+    city?: string;
     deepSleepPercent?: number;
     deepSleepMinutes?: number;
     lightSleepMinutes?: number;

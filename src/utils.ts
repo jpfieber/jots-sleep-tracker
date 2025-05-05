@@ -61,3 +61,105 @@ export function isEmoji(str: string): boolean {
     const len = trimmed.length;
     return len === 1 || len === 2;
 }
+
+// Cache for location lookups to minimize API requests
+const locationCache: { [key: string]: string } = {};
+
+interface LocationInfo {
+    rawCoords: string;
+    formattedLocation: string;
+}
+
+/**
+ * Convert coordinates to a readable location name using OpenStreetMap's Nominatim service
+ * Returns both raw coordinates and formatted city with state/country
+ */
+export async function coordsToLocationInfo(location: string): Promise<LocationInfo> {
+    try {
+        // Check if location has coordinates in format "lat,long"
+        const coords = location.split(',').map(n => parseFloat(n.trim()));
+        if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) {
+            return {
+                rawCoords: location,
+                formattedLocation: location
+            };
+        }
+
+        const [lat, long] = coords;
+        const cacheKey = `${lat},${long}`;
+
+        // Check cache first
+        if (locationCache[cacheKey]) {
+            return {
+                rawCoords: location,
+                formattedLocation: locationCache[cacheKey]
+            };
+        }
+
+        // Rate limiting - wait 1 second between requests as per Nominatim usage policy
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${long}&format=json`,
+            {
+                headers: {
+                    'User-Agent': 'Obsidian-Sleep-Tracker/1.0',
+                    'Accept-Language': 'en'
+                }
+            }
+        );
+
+        if (!response.ok) {
+            console.error('Failed to fetch location data:', response.statusText);
+            return {
+                rawCoords: location,
+                formattedLocation: location
+            };
+        }
+
+        const data = await response.json();
+        console.log('Raw location data from Nominatim:', data); // Debug log
+
+        // Extract location components
+        const city = data.address?.city ||
+            data.address?.town ||
+            data.address?.village ||
+            data.address?.municipality ||
+            data.address?.county ||
+            '';
+
+        let region = '';
+        // Handle US states - try multiple possible state code fields
+        if (data.address?.country_code?.toLowerCase() === 'us' ||
+            data.address?.country?.toLowerCase().includes('united states')) {
+            region = data.address?.state_code || // Try state_code first
+                data.address?.['ISO3166-2-lvl4']?.split('-')[1] || // Try ISO code
+                data.address?.state?.substring(0, 2).toUpperCase(); // Fallback to first 2 chars of state name
+        }
+        // Handle other countries
+        else if (data.address?.country &&
+            (!data.address?.country_code ||
+                data.address?.country_code?.toLowerCase() !== 'us')) {
+            region = data.address.country;
+        }
+
+        console.log('Extracted city:', city, 'region:', region); // Debug log
+
+        // Format location string
+        const formattedLocation = city && region ? `${city}, ${region}` : (city || location);
+
+        // Cache the result
+        locationCache[cacheKey] = formattedLocation;
+
+        return {
+            rawCoords: location,
+            formattedLocation
+        };
+    } catch (error) {
+        console.error('Failed to convert coordinates to location:', error);
+        return {
+            rawCoords: location,
+            formattedLocation: location
+        };
+    }
+}

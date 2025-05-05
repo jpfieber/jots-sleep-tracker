@@ -1,6 +1,7 @@
 import { request } from 'obsidian';
 import ICAL from 'ical.js';
 import type { SleepData } from '../types';
+import { coordsToLocationInfo } from '../utils';
 
 export class CalendarService {
     constructor(private calendarUrl: string) { }
@@ -34,7 +35,7 @@ export class CalendarService {
             // Parse the sleep data from the event description
             const description = latestEvent.description || '';
             const location = latestEvent.component.getFirstPropertyValue('location') || '';
-            return this.parseSleepData(latestEvent, description, location);
+            return await this.parseSleepData(latestEvent, description, location);
 
         } catch (error) {
             console.error('Failed to fetch calendar data:', error);
@@ -52,7 +53,7 @@ export class CalendarService {
             const jcalData = ICAL.parse(response);
             const comp = new ICAL.Component(jcalData);
             const vevents = comp.getAllSubcomponents('vevent');
-            const sleepData: SleepData[] = [];
+            const sleepDataPromises: Promise<SleepData>[] = [];
 
             // Find all events within the date range
             for (const vevent of vevents) {
@@ -64,12 +65,11 @@ export class CalendarService {
                 if (eventStartTime >= startTime && eventEndTime <= endTime) {
                     const description = event.description || '';
                     const location = event.component.getFirstPropertyValue('location') || '';
-                    const data = this.parseSleepData(event, description, location);
-                    sleepData.push(data);
+                    sleepDataPromises.push(this.parseSleepData(event, description, location));
                 }
             }
 
-            return sleepData;
+            return await Promise.all(sleepDataPromises);
 
         } catch (error) {
             console.error('Failed to fetch calendar data:', error);
@@ -77,17 +77,20 @@ export class CalendarService {
         }
     }
 
-    private parseSleepData(event: ICAL.Event, description: any, location: any): SleepData {
+    private async parseSleepData(event: ICAL.Event, description: any, location: any): Promise<SleepData> {
         const startTime = event.startDate.toJSDate().getTime();
         const endTime = event.endDate.toJSDate().getTime();
         const sleepDuration = (endTime - startTime) / (1000 * 60 * 60); // Convert to hours
+
+        const locationInfo = await coordsToLocationInfo(location?.toString() || '');
 
         // Initialize sleep data with required fields
         const sleepData: SleepData = {
             startTime: Math.floor(startTime / 1000),
             endTime: Math.floor(endTime / 1000),
             sleepDuration: sleepDuration,
-            location: location?.toString() || ''
+            location: locationInfo.rawCoords,
+            city: locationInfo.formattedLocation
         };
 
         // Parse the description for detailed sleep data

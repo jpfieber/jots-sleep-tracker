@@ -8,6 +8,7 @@ import { CalendarService } from './services/calendar-service';
 import { StyleManager } from './services/style-manager';
 import { MeasurementType, Settings, DEFAULT_SETTINGS, MeasurementRecord, SleepData } from './types';
 import { Chart, ChartConfiguration } from 'chart.js/auto';
+import { coordsToLocationInfo } from './utils';
 
 export default class SleepTrackerPlugin extends Plugin {
     settings!: Settings;
@@ -535,14 +536,15 @@ export default class SleepTrackerPlugin extends Plugin {
                     DD: sleepMoment.format('DD'),
                     ddd: sleepMoment.format('ddd'),
                     dddd: sleepMoment.format('dddd'),
-                    'YYYY-MM': sleepMoment.format('YYYY-MM'),
-                    'YYYY/MM': sleepMoment.format('YYYY/MM')
                 };
 
+                // Start with the subdirectory format
                 subDir = this.settings.sleepEventNotesSubDirectory;
-                for (const [key, value] of Object.entries(placeholders)) {
-                    subDir = subDir.replace(key, value);
-                }
+
+                // Replace all occurrences of placeholders, not just the first one
+                Object.entries(placeholders).forEach(([key, value]) => {
+                    subDir = subDir.replace(new RegExp(key, 'g'), value);
+                });
             } else {
                 // Default format if none specified
                 const year = sleepMoment.format('YYYY');
@@ -565,6 +567,21 @@ export default class SleepTrackerPlugin extends Plugin {
             const totalSleepMinutes = (sleepData.deepSleepMinutes || 0) + (sleepData.lightSleepMinutes || 0) + (sleepData.remMinutes || 0);
             const hasDetailedSleepStages = totalSleepMinutes > 0;
 
+            // Build sleep quality sections conditionally
+            const sleepQualityEntries = [
+                sleepData.efficiency !== undefined ? `📊 Sleep Efficiency: ${(sleepData.efficiency * 100).toFixed(1)}%` : '',
+                sleepData.cycles ? `📶 Sleep Cycles: ${sleepData.cycles}` : '',
+                sleepData.noisePercent !== undefined ? `🔊 Noise Level: ${sleepData.noisePercent.toFixed(1)}%` : '',
+                sleepData.snoringDuration ? `😴 Snoring: ${sleepData.snoringDuration}` : ''
+            ].filter(entry => entry !== '').join('\n');
+
+            // Build sleep stages section conditionally
+            const sleepStagesEntries = hasDetailedSleepStages ? [
+                sleepData.deepSleepMinutes ? `🌑 Deep Sleep:  ${sleepData.deepSleepPercent?.toFixed(1)}% (${sleepData.deepSleepMinutes}m)` : '',
+                sleepData.lightSleepMinutes ? `🌓 Light Sleep: ${(100 - (sleepData.deepSleepPercent || 0)).toFixed(1)}% (${sleepData.lightSleepMinutes}m)` : '',
+                sleepData.remMinutes ? `🌙 REM Sleep:   ${((sleepData.remMinutes / totalSleepMinutes) * 100).toFixed(1)}% (${sleepData.remMinutes}m)` : ''
+            ].filter(entry => entry !== '').join('\n') : 'No detailed sleep stage data available.';
+
             // Create the note content
             const noteContent = `---
 type: sleep
@@ -573,7 +590,8 @@ filename: ${date}_Sleep
 sleepStartTime: ${sleepMoment.format('HH:mm')}
 sleepEndTime: ${wakeMoment.format('HH:mm')}
 sleepDuration: ${durationYAML}
-sleepLocation: ${sleepData.location || 'N/A'}
+sleepLocation: ${sleepData.location || ''}
+sleepCity: ${sleepData.city || ''}
 sleepDeepPercent: ${sleepData.deepSleepPercent !== undefined ? sleepData.deepSleepPercent.toFixed(1) : 'N/A'}
 sleepCycles: ${sleepData.cycles || 'N/A'}
 sleepEfficiency: ${sleepData.efficiency !== undefined ? (sleepData.efficiency * 100).toFixed(1) : 'N/A'}
@@ -581,7 +599,7 @@ sleepNoiseLevel: ${sleepData.noisePercent !== undefined ? sleepData.noisePercent
 sleepGraph: ${sleepData.graph}` : ''}
 created: ${moment().format('YYYY-MM-DDTHH:mm:ssZ')}
 ---
-# ${date}: Sleep Data
+# ${date}: Sleep Data from ${sleepData.city}
 
 ## Sleep Times
 💤 Went to bed at ${sleepMoment.format('HH:mm')} on ${sleepMoment.format('dddd, MMMM D')}
@@ -591,16 +609,10 @@ created: ${moment().format('YYYY-MM-DDTHH:mm:ssZ')}
 ## Sleep Analysis${hasDetailedSleepStages ? `
 
 ### Sleep Stages:
-${sleepData.deepSleepMinutes ? `🌑 Deep Sleep:  ${sleepData.deepSleepPercent?.toFixed(1)}% (${sleepData.deepSleepMinutes}m)` : ''}
-${sleepData.lightSleepMinutes ? `🌓 Light Sleep: ${(100 - (sleepData.deepSleepPercent || 0)).toFixed(1)}% (${sleepData.lightSleepMinutes}m)` : ''}
-${sleepData.remMinutes ? `🌙 REM Sleep:   ${((sleepData.remMinutes / totalSleepMinutes) * 100).toFixed(1)}% (${sleepData.remMinutes}m)` : ''}` : '\nNo detailed sleep stage data available.'}
+${sleepStagesEntries}` : '\nNo detailed sleep stage data available.'}
 
 ### Sleep Quality:
-${sleepData.efficiency !== undefined ? `📊 Sleep Efficiency: ${(sleepData.efficiency * 100).toFixed(1)}%` : ''}
-${sleepData.cycles ? `🔄 Sleep Cycles: ${sleepData.cycles}` : ''}
-${sleepData.noisePercent !== undefined ? `🔊 Noise Level: ${sleepData.noisePercent.toFixed(1)}%` : ''}
-${sleepData.snoringDuration ? `😴 Snoring: ${sleepData.snoringDuration}` : ''}
-${sleepData.location ? `\n📍 Location: ${sleepData.location}` : ''}
+${sleepQualityEntries}
 
 ${sleepData.graph ? `## Sleep Pattern
 
