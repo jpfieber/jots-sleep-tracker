@@ -28,7 +28,7 @@ const buildOptions = {
     },
     entryPoints: ['src/main.ts'],
     bundle: true,
-    external: ['obsidian', 'node-ical', 'fs'],
+    external: ['obsidian', 'node-ical', 'fs', 'chart.js', 'chart.js/auto'],
     format: 'cjs',
     target: 'es2020',
     logLevel: "info",

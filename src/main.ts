@@ -7,6 +7,7 @@ import { GoogleFitService } from './services/googlefit';
 import { CalendarService } from './services/calendar-service';
 import { StyleManager } from './services/style-manager';
 import { MeasurementType, Settings, DEFAULT_SETTINGS, MeasurementRecord, SleepData } from './types';
+import { Chart, ChartConfiguration } from 'chart.js/auto';
 
 export default class SleepTrackerPlugin extends Plugin {
     settings!: Settings;
@@ -447,24 +448,32 @@ ${sleepData.snoringDuration ? `😴 Snoring: ${sleepData.snoringDuration}` : ''}
 
 ${sleepData.graph ? `## Sleep Pattern
 
-\`\`\`mermaid
-xychart-beta
-title Sleep Pattern
-x-axis ["00h", "01h", "02h", "03h", "04h", "05h", "06h", "07h", "08h", "09h", "10h", "11h", "12h", "13h", "14h", "15h", "16h", "17h", "18h", "19h", "20h", "21h", "22h", "23h"]
-y-axis "Sleep Depth" 0 --> 8
-line [${sleepData.graph.split('').map((char, i) => {
+\`\`\`chart
+type: line
+labels: [${Array.from({ length: 24 }, (_, i) => {
+                const time = moment(sleepData.startTime * 1000).add(i * (sleepData.sleepDuration * 60 / 24), 'minutes');
+                return `"${time.format('HH:mm')}"`;
+            }).join(',')}]
+series:
+  - title: Sleep Depth
+    data: [${sleepData.graph.split('').map(char => {
                 switch (char) {
-                    case '▁': return '1';   // ▁ = 1/8 height
-                    case '▂': return '2';   // ▂ = 2/8 height
-                    case '▃': return '3';   // ▃ = 3/8 height
-                    case '▄': return '4';   // ▄ = 4/8 height
-                    case '▅': return '5';   // ▅ = 5/8 height
-                    case '▆': return '6';   // ▆ = 6/8 height
-                    case '▇': return '7';   // ▇ = 7/8 height
-                    case '█': return '8';   // █ = 8/8 height (full)
+                    case '▁': return '1';
+                    case '▂': return '2';
+                    case '▃': return '3';
+                    case '▄': return '4';
+                    case '▅': return '5';
+                    case '▆': return '6';
+                    case '▇': return '7';
+                    case '█': return '8';
                     default: return '0';
                 }
-            }).join(', ')}]
+            }).join(',')}]
+tension: 0.4
+fill: true
+showLegend: false
+xAxisLabel: Sleep Pattern
+yAxisLabel: Sleep Depth
 \`\`\`` : ''}${sleepData.comment ? `\n\n` : ''}`;
 
             const file = await this.app.vault.create(notePath, noteContent);
