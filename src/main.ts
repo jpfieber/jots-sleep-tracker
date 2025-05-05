@@ -99,7 +99,7 @@ export default class SleepTrackerPlugin extends Plugin {
                     // Create a temporary function to capture the local Chart variable
                     const initChart = new Function('Chart', 'canvas', script.textContent || '');
                     initChart(Chart, canvas);
-                    
+
                     // Mark as initialized to prevent duplicate charts
                     (canvas as any).__chartInitialized = true;
                 } catch (error) {
@@ -114,7 +114,7 @@ export default class SleepTrackerPlugin extends Plugin {
             let startTime = '';
             let endTime = '';
             let data = '';
-            
+
             // Parse the block content
             lines.forEach(line => {
                 const [key, value] = line.split('=').map(s => s.trim());
@@ -137,7 +137,7 @@ export default class SleepTrackerPlugin extends Plugin {
             }
 
             // Create container and canvas
-            const container = el.createDiv({ 
+            const container = el.createDiv({
                 cls: 'jots-sleep-tracker-chart',
                 attr: { style: 'position: relative; height: 400px; width: 100%; margin: 20px 0;' }
             });
