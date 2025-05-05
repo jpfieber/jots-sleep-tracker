@@ -164,7 +164,7 @@ export const DEFAULT_SETTINGS: Settings = {
 
     // Calendar integration settings
     calendarUrl: 'https://calendar.google.com/calendar/ical/47871a9405310639ad56ab2c42c8230227232bda03838db99458b32ae2cdbdaa%40group.calendar.google.com/private-fd2c6c754cdfa28b0197606c03bf7abe/basic.ics',
-    useCalendarForSleepNotes: false,
+    useCalendarForSleepNotes: true,
 
     // Google Fit defaults
     enableGoogleFit: false,

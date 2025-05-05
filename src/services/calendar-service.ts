@@ -19,11 +19,9 @@ export class CalendarService {
             let latestEvent: ICAL.Event | null = null;
             let latestDate = 0;
 
-            // Find the most recent Sleep as Android event
+            // Find the most recent event
             for (const vevent of vevents) {
                 const event = new ICAL.Event(vevent);
-                if (!event.summary?.includes('Sleep as Android')) continue;
-
                 const eventDate = event.startDate.toJSDate().getTime();
                 if (eventDate > latestDate) {
                     latestDate = eventDate;
@@ -56,11 +54,9 @@ export class CalendarService {
             const vevents = comp.getAllSubcomponents('vevent');
             const sleepData: SleepData[] = [];
 
-            // Find all Sleep as Android events within the date range
+            // Find all events within the date range
             for (const vevent of vevents) {
                 const event = new ICAL.Event(vevent);
-                if (!event.summary?.includes('Sleep as Android')) continue;
-
                 const eventStartTime = Math.floor(event.startDate.toJSDate().getTime() / 1000);
                 const eventEndTime = Math.floor(event.endDate.toJSDate().getTime() / 1000);
 
@@ -81,7 +77,7 @@ export class CalendarService {
         }
     }
 
-    private parseSleepData(event: ICAL.Event, description: string, location: string): SleepData {
+    private parseSleepData(event: ICAL.Event, description: any, location: any): SleepData {
         const startTime = event.startDate.toJSDate().getTime();
         const endTime = event.endDate.toJSDate().getTime();
         const sleepDuration = (endTime - startTime) / (1000 * 60 * 60); // Convert to hours
@@ -91,14 +87,14 @@ export class CalendarService {
             startTime: Math.floor(startTime / 1000),
             endTime: Math.floor(endTime / 1000),
             sleepDuration: sleepDuration,
-            location: location
+            location: location?.toString() || ''
         };
 
         // Parse the description for detailed sleep data
-        const lines = description.split('\n');
+        const lines = (description?.toString() || '').split('\n');
         let graphData = '';
 
-        lines.forEach(line => {
+        lines.forEach((line: string) => {
             const trimmedLine = line.trim();
 
             if (trimmedLine.startsWith('Duration:')) {
@@ -106,7 +102,7 @@ export class CalendarService {
                 if (duration) sleepData.sleepDuration = duration;
             }
             else if (trimmedLine.startsWith('Deep sleep:')) {
-                const percentMatch = trimmedLine.match(/(\d+)%/);
+                const percentMatch = trimmedLine.match(/(\d+(?:\.\d+)?)%/);
                 if (percentMatch) {
                     const percent = parseFloat(percentMatch[1]);
                     if (!isNaN(percent)) {
@@ -127,7 +123,7 @@ export class CalendarService {
                 }
             }
             else if (trimmedLine.startsWith('Noise:')) {
-                const noiseMatch = trimmedLine.match(/(\d+)%/);
+                const noiseMatch = trimmedLine.match(/(\d+(?:\.\d+)?)%/);
                 if (noiseMatch) {
                     const noise = parseFloat(noiseMatch[1]);
                     if (!isNaN(noise)) sleepData.noisePercent = noise;

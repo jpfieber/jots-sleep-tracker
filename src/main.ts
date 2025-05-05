@@ -380,7 +380,7 @@ export default class SleepTrackerPlugin extends Plugin {
                     throw new Error('No sleep data found for the last 24 hours');
                 }
                 sleepData = sleepMeasurements[sleepMeasurements.length - 1];
-            } 
+            }
 
             if (!sleepData) {
                 throw new Error('No sleep data found from any source');
@@ -426,7 +426,7 @@ created: ${moment().format('YYYY-MM-DDTHH:mm:ssZ')}
 # Sleep Record for ${date}
 
 ## Sleep Times
-▶️ Went to bed at ${sleepMoment.format('HH:mm')} on ${sleepMoment.format('dddd, MMMM D')}
+💤 Went to bed at ${sleepMoment.format('HH:mm')} on ${sleepMoment.format('dddd, MMMM D')}
 ⏰ Woke up at ${wakeMoment.format('HH:mm')} on ${wakeMoment.format('dddd, MMMM D')}
 ⏱️ Total time in bed: ${durationFormatted}
 
@@ -447,7 +447,7 @@ ${sleepData.snoringDuration ? `😴 Snoring: ${sleepData.snoringDuration}` : ''}
 ${sleepData.graph ? `## Sleep Graph
 \`\`\`
 ${sleepData.graph}
-\`\`\`` : ''}${sleepData.comment ? `\n## Notes\n${sleepData.comment}` : ''}`;
+\`\`\`` : ''}${sleepData.comment ? sleepData.comment : ''}`;
 
             const file = await this.app.vault.create(notePath, noteContent);
             new Notice(`Created sleep note: ${notePath}`);
