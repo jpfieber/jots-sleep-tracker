@@ -520,15 +520,42 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                         this.plugin.settings.awakeNoteTemplate = value;
                         await this.plugin.saveSettings();
                     }));
+        }
 
+        // Sleep Event Notes Settings
+        new Setting(containerEl)
+            .setName('Enable Sleep Event Notes')
+            .setDesc('Create a note for each sleep event and populate it with extended sleep data')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.enableSleepEventNotes ?? false)
+                .onChange(async (value) => {
+                    this.plugin.settings.enableSleepEventNotes = value;
+                    await this.plugin.saveSettings();
+                    this.display();
+                }));
+
+        if (this.plugin.settings.enableSleepEventNotes) {
             new Setting(containerEl)
                 .setName('Sleep Notes Folder')
                 .setDesc('The folder where individual sleep note files will be stored.')
+                .setClass('jots-sleep-tracker-settings-indent')
                 .addText(text => text
                     .setPlaceholder('Stacks/Sleep')
                     .setValue(this.plugin.settings.sleepNotesFolder)
                     .onChange(async (value) => {
                         this.plugin.settings.sleepNotesFolder = value;
+                        await this.plugin.saveSettings();
+                    }));
+
+            new Setting(containerEl)
+                .setName('Subdirectory Format')
+                .setDesc('Format for organizing sleep event notes in subfolders (e.g. YYYY/YYYY-MM)')
+                .setClass('jots-sleep-tracker-settings-indent')
+                .addText(text => text
+                    .setPlaceholder('YYYY/YYYY-MM')
+                    .setValue(this.plugin.settings.sleepEventNotesSubDirectory)
+                    .onChange(async (value) => {
+                        this.plugin.settings.sleepEventNotesSubDirectory = value;
                         await this.plugin.saveSettings();
                     }));
         }

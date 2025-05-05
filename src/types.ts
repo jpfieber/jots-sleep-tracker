@@ -61,6 +61,8 @@ export interface Settings {
     asleepNoteTemplate: string;
     awakeNoteTemplate: string;
     sleepNotesFolder: string;
+    enableSleepEventNotes: boolean;
+    sleepEventNotesSubDirectory: string;  // New setting
 
     // Measurement file settings
     enableMeasurementFiles: boolean;
@@ -122,6 +124,8 @@ export const DEFAULT_SETTINGS: Settings = {
     asleepNoteTemplate: '| <date> | <time> (<mtime>) | 💤 Asleep | |',
     awakeNoteTemplate: '| <date> | <time> (<mtime>) | ⏰ Awake | <duration> |',
     sleepNotesFolder: 'Stacks/Sleep',
+    enableSleepEventNotes: false,
+    sleepEventNotesSubDirectory: '',  // New setting with default value
 
     enableMeasurementFiles: true,
     measurementFolder: 'Sleep',

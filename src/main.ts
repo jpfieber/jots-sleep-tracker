@@ -526,13 +526,34 @@ export default class SleepTrackerPlugin extends Plugin {
             const wakeMoment = moment(sleepData.endTime * 1000);
             const date = sleepMoment.format('YYYY-MM-DD');
 
-            // Create the note path using the same folder structure as events
-            const year = sleepMoment.format('YYYY');
-            const yearMonth = sleepMoment.format('YYYY-MM');
-            const notePath = `${this.settings.sleepNotesFolder}/${year}/${yearMonth}/${date}_Sleep.md`;
+            // Use the configured subdirectory format if available, otherwise default to year/month
+            let subDir = '';
+            if (this.settings.sleepEventNotesSubDirectory) {
+                const placeholders = {
+                    YYYY: sleepMoment.format('YYYY'),
+                    MM: sleepMoment.format('MM'),
+                    DD: sleepMoment.format('DD'),
+                    ddd: sleepMoment.format('ddd'),
+                    dddd: sleepMoment.format('dddd'),
+                    'YYYY-MM': sleepMoment.format('YYYY-MM'),
+                    'YYYY/MM': sleepMoment.format('YYYY/MM')
+                };
+
+                subDir = this.settings.sleepEventNotesSubDirectory;
+                for (const [key, value] of Object.entries(placeholders)) {
+                    subDir = subDir.replace(key, value);
+                }
+            } else {
+                // Default format if none specified
+                const year = sleepMoment.format('YYYY');
+                const yearMonth = sleepMoment.format('YYYY-MM');
+                subDir = `${year}/${yearMonth}`;
+            }
+
+            const notePath = `${this.settings.sleepNotesFolder}/${subDir}/${date}_Sleep.md`;
 
             // Ensure the folder structure exists
-            await this.createFolderStructure(`${this.settings.sleepNotesFolder}/${year}/${yearMonth}`);
+            await this.createFolderStructure(`${this.settings.sleepNotesFolder}/${subDir}`);
 
             // Format duration for YAML and note body
             const durationHours = Math.floor(sleepData.sleepDuration);
@@ -547,8 +568,8 @@ export default class SleepTrackerPlugin extends Plugin {
             // Create the note content
             const noteContent = `---
 type: sleep
-title: Sleep Record ${date}
 date: ${date}
+filename: ${date}_Sleep
 sleepStartTime: ${sleepMoment.format('HH:mm')}
 sleepEndTime: ${wakeMoment.format('HH:mm')}
 sleepDuration: ${durationYAML}
@@ -560,7 +581,7 @@ sleepNoiseLevel: ${sleepData.noisePercent !== undefined ? sleepData.noisePercent
 sleepGraph: ${sleepData.graph}` : ''}
 created: ${moment().format('YYYY-MM-DDTHH:mm:ssZ')}
 ---
-# Sleep Record for ${date}
+# ${date}: Sleep Data
 
 ## Sleep Times
 💤 Went to bed at ${sleepMoment.format('HH:mm')} on ${sleepMoment.format('dddd, MMMM D')}
@@ -569,17 +590,17 @@ created: ${moment().format('YYYY-MM-DDTHH:mm:ssZ')}
 
 ## Sleep Analysis${hasDetailedSleepStages ? `
 
-**Sleep Stages:**
+### Sleep Stages:
 ${sleepData.deepSleepMinutes ? `🌑 Deep Sleep:  ${sleepData.deepSleepPercent?.toFixed(1)}% (${sleepData.deepSleepMinutes}m)` : ''}
 ${sleepData.lightSleepMinutes ? `🌓 Light Sleep: ${(100 - (sleepData.deepSleepPercent || 0)).toFixed(1)}% (${sleepData.lightSleepMinutes}m)` : ''}
 ${sleepData.remMinutes ? `🌙 REM Sleep:   ${((sleepData.remMinutes / totalSleepMinutes) * 100).toFixed(1)}% (${sleepData.remMinutes}m)` : ''}` : '\nNo detailed sleep stage data available.'}
 
-**Sleep Quality:**
+### Sleep Quality:
 ${sleepData.efficiency !== undefined ? `📊 Sleep Efficiency: ${(sleepData.efficiency * 100).toFixed(1)}%` : ''}
 ${sleepData.cycles ? `🔄 Sleep Cycles: ${sleepData.cycles}` : ''}
-${sleepData.awakeMinutes ? `⚡ Time Awake: ${sleepData.awakeMinutes} minutes` : ''}
 ${sleepData.noisePercent !== undefined ? `🔊 Noise Level: ${sleepData.noisePercent.toFixed(1)}%` : ''}
-${sleepData.snoringDuration ? `😴 Snoring: ${sleepData.snoringDuration}` : ''}${sleepData.location ? `\n📍 Location: ${sleepData.location}` : ''}
+${sleepData.snoringDuration ? `😴 Snoring: ${sleepData.snoringDuration}` : ''}
+${sleepData.location ? `\n📍 Location: ${sleepData.location}` : ''}
 
 ${sleepData.graph ? `## Sleep Pattern
 
