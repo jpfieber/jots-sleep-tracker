@@ -471,9 +471,11 @@ series:
             }).join(',')}]
 tension: 0.4
 fill: true
-showLegend: false
-xAxisLabel: Sleep Pattern
-yAxisLabel: Sleep Depth
+legend: false
+xTitle: Sleep Pattern
+yTitle: Sleep Depth
+beginAtZero: true
+yMax: 8
 \`\`\`` : ''}${sleepData.comment ? `\n\n` : ''}`;
 
             const file = await this.app.vault.create(notePath, noteContent);
