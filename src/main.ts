@@ -420,7 +420,8 @@ sleepLocation: ${sleepData.location || 'N/A'}
 sleepDeepPercent: ${sleepData.deepSleepPercent !== undefined ? sleepData.deepSleepPercent.toFixed(1) : 'N/A'}
 sleepCycles: ${sleepData.cycles || 'N/A'}
 sleepEfficiency: ${sleepData.efficiency !== undefined ? (sleepData.efficiency * 100).toFixed(1) : 'N/A'}
-sleepNoiseLevel: ${sleepData.noisePercent !== undefined ? sleepData.noisePercent.toFixed(1) : 'N/A'}
+sleepNoiseLevel: ${sleepData.noisePercent !== undefined ? sleepData.noisePercent.toFixed(1) : 'N/A'}${sleepData.graph ? `
+sleepGraph: ${sleepData.graph}` : ''}
 created: ${moment().format('YYYY-MM-DDTHH:mm:ssZ')}
 ---
 # Sleep Record for ${date}
@@ -444,10 +445,27 @@ ${sleepData.awakeMinutes ? `⚡ Time Awake: ${sleepData.awakeMinutes} minutes` :
 ${sleepData.noisePercent !== undefined ? `🔊 Noise Level: ${sleepData.noisePercent.toFixed(1)}%` : ''}
 ${sleepData.snoringDuration ? `😴 Snoring: ${sleepData.snoringDuration}` : ''}${sleepData.location ? `\n📍 Location: ${sleepData.location}` : ''}
 
-${sleepData.graph ? `## Sleep Graph
-\`\`\`
-${sleepData.graph}
-\`\`\`` : ''}${sleepData.comment ? sleepData.comment : ''}`;
+${sleepData.graph ? `## Sleep Pattern
+
+\`\`\`mermaid
+xychart-beta
+title Sleep Pattern
+x-axis ["00h", "01h", "02h", "03h", "04h", "05h", "06h", "07h", "08h", "09h", "10h", "11h", "12h", "13h", "14h", "15h", "16h", "17h", "18h", "19h", "20h", "21h", "22h", "23h"]
+y-axis "Sleep Depth" 0 --> 8
+line [${sleepData.graph.split('').map((char, i) => {
+                switch (char) {
+                    case '▁': return '1';   // ▁ = 1/8 height
+                    case '▂': return '2';   // ▂ = 2/8 height
+                    case '▃': return '3';   // ▃ = 3/8 height
+                    case '▄': return '4';   // ▄ = 4/8 height
+                    case '▅': return '5';   // ▅ = 5/8 height
+                    case '▆': return '6';   // ▆ = 6/8 height
+                    case '▇': return '7';   // ▇ = 7/8 height
+                    case '█': return '8';   // █ = 8/8 height (full)
+                    default: return '0';
+                }
+            }).join(', ')}]
+\`\`\`` : ''}${sleepData.comment ? `\n\n` : ''}`;
 
             const file = await this.app.vault.create(notePath, noteContent);
             new Notice(`Created sleep note: ${notePath}`);
