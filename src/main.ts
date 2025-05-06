@@ -404,7 +404,7 @@ export default class SleepTrackerPlugin extends Plugin {
                 const sleepTimeStr = sleepMoment.format('HH:mm');
                 const wakeTimeStr = wakeMoment.format('HH:mm');
 
-                // Add sleep events using sleep date as reference
+                // Add sleep event using sleep date as reference
                 if (!startDate || !endDate || moment(sleepDateStr).isBetween(moment(startDate), moment(endDate), 'day', '[]')) {
                     events.push({
                         type: 'sleep',
@@ -418,7 +418,7 @@ export default class SleepTrackerPlugin extends Plugin {
                     });
                 }
 
-                // Add wake events using wake date as reference
+                // Add wake event using wake date as reference
                 if (!startDate || !endDate || moment(wakeDateStr).isBetween(moment(startDate), moment(endDate), 'day', '[]')) {
                     events.push({
                         type: 'wake',
@@ -525,17 +525,17 @@ export default class SleepTrackerPlugin extends Plugin {
 
             const sleepMoment = moment(sleepData.startTime * 1000);
             const wakeMoment = moment(sleepData.endTime * 1000);
-            const date = sleepMoment.format('YYYY-MM-DD');
+            const date = wakeMoment.format('YYYY-MM-DD');  // Changed to use wake date
 
             // Use the configured subdirectory format if available, otherwise default to year/month
             let subDir = '';
             if (this.settings.sleepEventNotesSubDirectory) {
                 const placeholders = {
-                    YYYY: sleepMoment.format('YYYY'),
-                    MM: sleepMoment.format('MM'),
-                    DD: sleepMoment.format('DD'),
-                    ddd: sleepMoment.format('ddd'),
-                    dddd: sleepMoment.format('dddd'),
+                    YYYY: wakeMoment.format('YYYY'),  // Changed to use wake date
+                    MM: wakeMoment.format('MM'),      // Changed to use wake date
+                    DD: wakeMoment.format('DD'),      // Changed to use wake date
+                    ddd: wakeMoment.format('ddd'),    // Changed to use wake date
+                    dddd: wakeMoment.format('dddd'),  // Changed to use wake date
                 };
 
                 // Start with the subdirectory format
@@ -547,8 +547,8 @@ export default class SleepTrackerPlugin extends Plugin {
                 });
             } else {
                 // Default format if none specified
-                const year = sleepMoment.format('YYYY');
-                const yearMonth = sleepMoment.format('YYYY-MM');
+                const year = wakeMoment.format('YYYY');       // Changed to use wake date
+                const yearMonth = wakeMoment.format('YYYY-MM'); // Changed to use wake date
                 subDir = `${year}/${yearMonth}`;
             }
 
