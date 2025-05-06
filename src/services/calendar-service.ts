@@ -101,7 +101,13 @@ export class CalendarService {
         let graphData = '';
 
         lines.forEach((line: string) => {
-            const trimmedLine = line.trim();
+            // Clean the line of any HTML tags and trim
+            const trimmedLine = line.replace(/<[^>]*>/g, '').trim();
+
+            // Skip geo tags that appear at the end of some calendar entries
+            if (trimmedLine.startsWith('#geo')) {
+                return;
+            }
 
             if (trimmedLine.startsWith('Duration:')) {
                 const duration = this.parseTimeToHours(trimmedLine.substring(9));
@@ -136,10 +142,16 @@ export class CalendarService {
                 }
             }
             else if (trimmedLine.startsWith('Snoring:')) {
-                sleepData.snoringDuration = trimmedLine.substring(9).trim();
+                // Clean and store just the snoring duration text
+                const snoringText = trimmedLine.substring(9).trim();
+                sleepData.snoringDuration = snoringText;
             }
             else if (trimmedLine.startsWith('Comment:')) {
-                sleepData.comment = trimmedLine.substring(8).trim();
+                // Store clean comment text, excluding any geo tags
+                const commentText = trimmedLine.substring(8).trim();
+                if (!commentText.startsWith('#geo')) {
+                    sleepData.comment = commentText;
+                }
             }
             else if (trimmedLine.match(/^[▁▂▃▄▅▆▇█]+$/)) {
                 sleepData.graph = trimmedLine;

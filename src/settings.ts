@@ -38,6 +38,222 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
+        // Data Sync Settings
+        containerEl.createEl('h3', { text: 'Data Sync Settings' });
+        const syncDesc = containerEl.createEl('p');
+        syncDesc.appendText('Configure how sleep data is synced from your data sources. Calendar data will be used if available, falling back to Google Fit if needed.');
+
+        new Setting(containerEl)
+            .setName('Days to Import')
+            .setDesc('Number of days of sleep data to import when using auto-sync or the "Add Sleep Records Automatically" command')
+            .addText(text => text
+                .setPlaceholder('7')
+                .setValue(this.plugin.settings.syncDaysToImport.toString())
+                .onChange(async (value) => {
+                    const days = parseInt(value);
+                    if (!isNaN(days) && days > 0) {
+                        this.plugin.settings.syncDaysToImport = days;
+                        await this.plugin.saveSettings();
+                    }
+                }));
+
+        // Manual date range sync controls
+        const manualSyncHeader = containerEl.createDiv();
+        manualSyncHeader.createEl('h4', { text: 'Manual Date Range Sync' });
+
+        const syncDiv = manualSyncHeader.createDiv({ cls: 'jots-sleep-tracker-sync-controls' });
+        const dateInputsDiv = syncDiv.createDiv({ cls: 'jots-sleep-tracker-date-inputs' });
+        const startDateDiv = dateInputsDiv.createDiv();
+        startDateDiv.createEl('label', { text: 'Start Date: ' }).style.marginRight = '5px';
+        const startDateInput = startDateDiv.createEl('input', {
+            attr: {
+                type: 'date',
+                required: 'required',
+                value: this.plugin.settings.lastSyncStartDate || ''
+            }
+        });
+        if (startDateInput) {
+            const startDateHandler = async () => {
+                this.plugin.settings.lastSyncStartDate = startDateInput.value;
+                await this.plugin.saveSettings();
+            };
+            this.addSafeEventListener(startDateInput, 'change', startDateHandler);
+        }
+
+        const endDateDiv = dateInputsDiv.createDiv();
+        endDateDiv.createEl('label', { text: 'End Date: ' }).style.marginRight = '5px';
+        const endDateInput = endDateDiv.createEl('input', {
+            attr: {
+                type: 'date',
+                required: 'required',
+                value: this.plugin.settings.lastSyncEndDate || ''
+            }
+        });
+        if (endDateInput) {
+            const endDateHandler = async () => {
+                this.plugin.settings.lastSyncEndDate = endDateInput.value;
+                await this.plugin.saveSettings();
+            };
+            this.addSafeEventListener(endDateInput, 'change', endDateHandler);
+        }
+
+        // Add sync destination options
+        const destinationDiv = syncDiv.createDiv({ cls: 'jots-sleep-tracker-destination-options' });
+
+        // Journal entry checkbox
+        const journalDiv = destinationDiv.createDiv('jots-sleep-tracker-settings-indent');
+        journalDiv.style.display = 'flex';
+        journalDiv.style.alignItems = 'center';
+        journalDiv.style.gap = '5px';
+        const journalCheck = journalDiv.createEl('input', {
+            attr: {
+                type: 'checkbox'
+            }
+        });
+        journalCheck.checked = this.plugin.settings.lastSyncJournalEnabled;
+        journalDiv.createEl('span', { text: 'Add to Journal' });
+
+        // Sleep note checkbox
+        const sleepNoteDiv = destinationDiv.createDiv();
+        sleepNoteDiv.style.display = 'flex';
+        sleepNoteDiv.style.alignItems = 'center';
+        sleepNoteDiv.style.gap = '5px';
+        const sleepNoteCheck = sleepNoteDiv.createEl('input', {
+            attr: {
+                type: 'checkbox'
+            }
+        });
+        sleepNoteCheck.checked = this.plugin.settings.lastSyncSleepNoteEnabled;
+        sleepNoteDiv.createEl('span', { text: 'Add to Sleep Note' });
+
+        // Progress container with progress bar and cancel button
+        const progressDiv = syncDiv.createDiv();
+        progressDiv.style.display = 'none'; // This needs to stay as it's dynamically toggled
+
+        const progressBarContainer = progressDiv.createDiv('jots-sleep-tracker-progress-container');
+        const progressBar = progressBarContainer.createDiv('jots-sleep-tracker-progress-bar');
+        const progressStatusDiv = progressDiv.createDiv('jots-sleep-tracker-progress-status');
+        const progressText = progressStatusDiv.createSpan({ cls: 'jots-sleep-tracker-progress-text' });
+        const cancelButton = progressStatusDiv.createEl('button', {
+            text: 'Cancel',
+            cls: ['mod-warning', 'jots-sleep-tracker-cancel-button']
+        });
+
+        // Single sync button
+        const buttonDiv = syncDiv.createDiv();
+
+        const syncRangeButton = buttonDiv.createEl('button', {
+            text: 'Sync Date Range',
+            cls: 'mod-cta'
+        });
+        syncRangeButton.disabled = !(
+            (this.plugin.settings.useCalendarForSleepNotes && this.plugin.settings.calendarUrl) ||
+            (this.plugin.settings.enableGoogleFit && this.plugin.settings.googleAccessToken)
+        );
+
+        let currentAbortController: AbortController | null = null;
+
+        const startSync = async (startDate?: string, endDate?: string) => {
+            if (currentAbortController) {
+                currentAbortController.abort();
+            }
+            currentAbortController = new AbortController();
+
+            progressDiv.style.display = 'block';
+            cancelButton.style.display = 'inline-block';
+            syncRangeButton.disabled = true;
+            syncRangeButton.style.opacity = '0.5';
+
+            const tempSettings = {
+                enableJournalEntry: journalCheck.checked,
+                enableSleepNote: sleepNoteCheck.checked
+            };
+
+            try {
+                await this.plugin.syncSleepData(startDate, endDate, (current, total) => {
+                    if (currentAbortController?.signal.aborted) {
+                        throw new Error('Sync cancelled');
+                    }
+                    const percent = (current / total) * 100;
+                    progressBar.style.width = `${percent}%`;
+                    progressText.setText(`Syncing sleep data... ${current}/${total} days`);
+                }, tempSettings);
+                progressBar.style.width = '100%';
+                progressText.setText('Sync completed successfully!');
+                setTimeout(() => {
+                    progressDiv.style.display = 'none';
+                    progressBar.style.width = '0%';
+                    cancelButton.style.display = 'none';
+                }, 3000);
+            } catch (error) {
+                if (error instanceof Error && error.message === 'Sync cancelled') {
+                    progressText.setText('Sync cancelled');
+                } else {
+                    progressText.setText('Sync failed. Check console for details.');
+                    console.error('Sync error:', error);
+                }
+                setTimeout(() => {
+                    progressDiv.style.display = 'none';
+                    progressBar.style.width = '0%';
+                    cancelButton.style.display = 'none';
+                }, 3000);
+            } finally {
+                currentAbortController = null;
+                syncRangeButton.disabled = !(
+                    (this.plugin.settings.useCalendarForSleepNotes && this.plugin.settings.calendarUrl) ||
+                    (this.plugin.settings.enableGoogleFit && this.plugin.settings.googleAccessToken)
+                );
+                syncRangeButton.style.opacity = '1';
+            }
+        };
+
+        cancelButton.onclick = () => {
+            if (currentAbortController) {
+                currentAbortController.abort();
+            }
+        };
+
+        syncRangeButton.onclick = async () => {
+            const startDate = startDateInput.value;
+            const endDate = endDateInput.value;
+
+            if (!startDate || !endDate) {
+                new Notice('Please enter both start and end dates');
+                return;
+            }
+
+            if (startDate > endDate) {
+                new Notice('Start date must be before or equal to end date');
+                return;
+            }
+
+            // Store sync settings in plugin settings
+            this.plugin.settings.lastSyncStartDate = startDate;
+            this.plugin.settings.lastSyncEndDate = endDate;
+            this.plugin.settings.lastSyncJournalEnabled = journalCheck.checked;
+            this.plugin.settings.lastSyncSleepNoteEnabled = sleepNoteCheck.checked;
+            await this.plugin.saveSettings();
+
+            await startSync(startDate, endDate);
+        };
+
+        // Save checkbox states when changed
+        if (journalCheck) {
+            const journalHandler = async () => {
+                this.plugin.settings.lastSyncJournalEnabled = journalCheck.checked;
+                await this.plugin.saveSettings();
+            };
+            this.addSafeEventListener(journalCheck, 'change', journalHandler);
+        }
+
+        if (sleepNoteCheck) {
+            const sleepNoteHandler = async () => {
+                this.plugin.settings.lastSyncSleepNoteEnabled = sleepNoteCheck.checked;
+                await this.plugin.saveSettings();
+            };
+            this.addSafeEventListener(sleepNoteCheck, 'change', sleepNoteHandler);
+        }
+
         // Calendar Integration Settings
         new Setting(containerEl)
             .setName('Use Calendar for Sleep Notes')
@@ -145,202 +361,6 @@ export class SleepTrackerSettingsTab extends PluginSettingTab {
                             await this.plugin.saveSettings();
                             this.plugin.setupGoogleFitSync();
                         }));
-
-                // Manual sync section now as a subsection
-                const manualSyncHeader = containerEl.createEl('div', { cls: 'jots-sleep-tracker-settings-indent' });
-                manualSyncHeader.createEl('h4', { text: 'Manual Data Sync' });
-                manualSyncHeader.createEl('p', { text: 'Sync sleep data from your calendar or Google Fit. Calendar data will be used if available, falling back to Google Fit if needed.' });
-
-                const syncDiv = manualSyncHeader.createDiv({ cls: 'jots-sleep-tracker-sync-controls' });
-                const dateInputsDiv = syncDiv.createDiv({ cls: 'jots-sleep-tracker-date-inputs' });
-                const startDateDiv = dateInputsDiv.createDiv();
-                startDateDiv.createEl('label', { text: 'Start Date: ' }).style.marginRight = '5px';
-                const startDateInput = startDateDiv.createEl('input', {
-                    attr: {
-                        type: 'date',
-                        required: 'required',
-                        value: this.plugin.settings.lastSyncStartDate || ''
-                    }
-                });
-                if (startDateInput) {
-                    const startDateHandler = async () => {
-                        this.plugin.settings.lastSyncStartDate = startDateInput.value;
-                        await this.plugin.saveSettings();
-                    };
-                    this.addSafeEventListener(startDateInput, 'change', startDateHandler);
-                }
-
-                const endDateDiv = dateInputsDiv.createDiv();
-                endDateDiv.createEl('label', { text: 'End Date: ' }).style.marginRight = '5px';
-                const endDateInput = endDateDiv.createEl('input', {
-                    attr: {
-                        type: 'date',
-                        required: 'required',
-                        value: this.plugin.settings.lastSyncEndDate || ''
-                    }
-                });
-                if (endDateInput) {
-                    const endDateHandler = async () => {
-                        this.plugin.settings.lastSyncEndDate = endDateInput.value;
-                        await this.plugin.saveSettings();
-                    };
-                    this.addSafeEventListener(endDateInput, 'change', endDateHandler);
-                }
-
-                // Add sync destination options
-                const destinationDiv = syncDiv.createDiv({ cls: 'jots-sleep-tracker-destination-options' });
-
-                // Journal entry checkbox
-                const journalDiv = destinationDiv.createDiv('jots-sleep-tracker-settings-indent');
-                journalDiv.style.display = 'flex';
-                journalDiv.style.alignItems = 'center';
-                journalDiv.style.gap = '5px';
-                const journalCheck = journalDiv.createEl('input', {
-                    attr: {
-                        type: 'checkbox'
-                    }
-                });
-                journalCheck.checked = this.plugin.settings.lastSyncJournalEnabled;
-                journalDiv.createEl('span', { text: 'Add to Journal' });
-
-                // Sleep note checkbox
-                const sleepNoteDiv = destinationDiv.createDiv();
-                sleepNoteDiv.style.display = 'flex';
-                sleepNoteDiv.style.alignItems = 'center';
-                sleepNoteDiv.style.gap = '5px';
-                const sleepNoteCheck = sleepNoteDiv.createEl('input', {
-                    attr: {
-                        type: 'checkbox'
-                    }
-                });
-                sleepNoteCheck.checked = this.plugin.settings.lastSyncSleepNoteEnabled;
-                sleepNoteDiv.createEl('span', { text: 'Add to Sleep Note' });
-
-                // Save checkbox states when changed
-                if (journalCheck) {
-                    const journalHandler = async () => {
-                        this.plugin.settings.lastSyncJournalEnabled = journalCheck.checked;
-                        await this.plugin.saveSettings();
-                    };
-                    this.addSafeEventListener(journalCheck, 'change', journalHandler);
-                }
-
-                if (sleepNoteCheck) {
-                    const sleepNoteHandler = async () => {
-                        this.plugin.settings.lastSyncSleepNoteEnabled = sleepNoteCheck.checked;
-                        await this.plugin.saveSettings();
-                    };
-                    this.addSafeEventListener(sleepNoteCheck, 'change', sleepNoteHandler);
-                }
-
-                // Progress container with progress bar and cancel button
-                const progressDiv = syncDiv.createDiv();
-                progressDiv.style.display = 'none'; // This needs to stay as it's dynamically toggled
-
-                const progressBarContainer = progressDiv.createDiv('jots-sleep-tracker-progress-container');
-                const progressBar = progressBarContainer.createDiv('jots-sleep-tracker-progress-bar');
-                const progressStatusDiv = progressDiv.createDiv('jots-sleep-tracker-progress-status');
-                const progressText = progressStatusDiv.createSpan({ cls: 'jots-sleep-tracker-progress-text' });
-                const cancelButton = progressStatusDiv.createEl('button', {
-                    text: 'Cancel',
-                    cls: ['mod-warning', 'jots-sleep-tracker-cancel-button']
-                });
-
-                // Single sync button
-                const buttonDiv = syncDiv.createDiv();
-
-                const syncRangeButton = buttonDiv.createEl('button', {
-                    text: 'Sync Date Range',
-                    cls: 'mod-cta'
-                });
-                syncRangeButton.disabled = !(this.plugin.settings.googleAccessToken || (this.plugin.settings.useCalendarForSleepNotes && this.plugin.settings.calendarUrl));
-
-                let currentAbortController: AbortController | null = null;
-
-                const startSync = async (startDate?: string, endDate?: string) => {
-                    if (currentAbortController) {
-                        currentAbortController.abort();
-                    }
-                    currentAbortController = new AbortController();
-
-                    progressDiv.style.display = 'block';
-                    cancelButton.style.display = 'inline-block';
-                    syncRangeButton.disabled = true;
-                    syncRangeButton.style.opacity = '0.5';
-
-                    const tempSettings = {
-                        enableJournalEntry: journalCheck.checked,
-                        enableSleepNote: sleepNoteCheck.checked
-                    };
-
-                    try {
-                        await this.plugin.syncSleepData(startDate, endDate, (current, total) => {
-                            if (currentAbortController?.signal.aborted) {
-                                throw new Error('Sync cancelled');
-                            }
-                            const percent = (current / total) * 100;
-                            progressBar.style.width = `${percent}%`;
-                            progressText.setText(`Syncing sleep data... ${current}/${total} days`);
-                        }, tempSettings);
-                        progressBar.style.width = '100%';
-                        progressText.setText('Sync completed successfully!');
-                        setTimeout(() => {
-                            progressDiv.style.display = 'none';
-                            progressBar.style.width = '0%';
-                            cancelButton.style.display = 'none';
-                        }, 3000);
-                    } catch (error) {
-                        if (error instanceof Error && error.message === 'Sync cancelled') {
-                            progressText.setText('Sync cancelled');
-                        } else {
-                            progressText.setText('Sync failed. Check console for details.');
-                            console.error('Sync error:', error);
-                        }
-                        setTimeout(() => {
-                            progressDiv.style.display = 'none';
-                            progressBar.style.width = '0%';
-                            cancelButton.style.display = 'none';
-                        }, 3000);
-                    } finally {
-                        currentAbortController = null;
-                        // Update button state to enable if either calendar or Google Fit is available
-                        syncRangeButton.disabled = !(
-                            (this.plugin.settings.useCalendarForSleepNotes && this.plugin.settings.calendarUrl) ||
-                            (this.plugin.settings.enableGoogleFit && this.plugin.settings.googleAccessToken)
-                        );
-                        syncRangeButton.style.opacity = '1';
-                    }
-                };
-
-                cancelButton.onclick = () => {
-                    if (currentAbortController) {
-                        currentAbortController.abort();
-                    }
-                };
-
-                syncRangeButton.onclick = async () => {
-                    const startDate = startDateInput.value;
-                    const endDate = endDateInput.value;
-
-                    if (!startDate || !endDate) {
-                        new Notice('Please enter both start and end dates');
-                        return;
-                    }
-
-                    if (startDate > endDate) {
-                        new Notice('Start date must be before or equal to end date');
-                        return;
-                    }
-
-                    // Store sync settings in plugin settings
-                    this.plugin.settings.lastSyncStartDate = startDate;
-                    this.plugin.settings.lastSyncEndDate = endDate;
-                    this.plugin.settings.lastSyncJournalEnabled = journalCheck.checked;
-                    this.plugin.settings.lastSyncSleepNoteEnabled = sleepNoteCheck.checked;
-                    await this.plugin.saveSettings();
-
-                    await startSync(startDate, endDate);
-                };
             }
         }
 

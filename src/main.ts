@@ -350,20 +350,19 @@ export default class SleepTrackerPlugin extends Plugin {
 
                 new Notice(`Syncing sleep data from ${startDate} to ${endDate}`);
             } else {
-                // Default to last 7 days, plus padding days
+                // Default to last N days based on settings, plus padding days
                 const now = moment();
                 endTime = now.add(1, 'day').endOf('day').valueOf() / 1000;
-                startTime = now.subtract(8, 'days').startOf('day').valueOf() / 1000;
+                startTime = now.subtract(this.settings.syncDaysToImport + 1, 'days').startOf('day').valueOf() / 1000;
 
-                new Notice('Syncing sleep data from the last 7 days');
+                new Notice(`Syncing sleep data from the last ${this.settings.syncDaysToImport} days`);
             }
 
             // Calculate total days for progress tracking (not including padding days)
             const totalDays = Math.ceil((
                 moment(endDate || moment()).endOf('day').valueOf() -
-                moment(startDate || moment().subtract(7, 'days')).startOf('day').valueOf()
+                moment(startDate || moment().subtract(this.settings.syncDaysToImport, 'days')).startOf('day').valueOf()
             ) / (24 * 60 * 60 * 1000));
-            const processedDays = new Set<string>();
 
             let sleepMeasurements: SleepData[] = [];
 
@@ -387,12 +386,13 @@ export default class SleepTrackerPlugin extends Plugin {
                 throw new Error('No sleep data found from any source');
             }
 
-            // Create arrays to hold sleep and wake events
+            // Convert sleep measurements to event records organized by date
             type SleepEvent = {
                 type: 'sleep' | 'wake';
                 date: string;
                 time: string;
                 record: MeasurementRecord;
+                sleepData: SleepData;
             };
             const events: SleepEvent[] = [];
 
@@ -414,7 +414,8 @@ export default class SleepTrackerPlugin extends Plugin {
                             date: `${sleepDateStr} ${sleepTimeStr}`,
                             userId: this.settings.defaultUser || this.settings.users[0]?.id || '',
                             asleepTime: sleepTimeStr
-                        }
+                        },
+                        sleepData: measurement
                     });
                 }
 
@@ -429,7 +430,8 @@ export default class SleepTrackerPlugin extends Plugin {
                             userId: this.settings.defaultUser || this.settings.users[0]?.id || '',
                             awakeTime: wakeTimeStr,
                             sleepDuration: measurement.sleepDuration?.toFixed(1)
-                        }
+                        },
+                        sleepData: measurement
                     });
                 }
             }
@@ -446,19 +448,42 @@ export default class SleepTrackerPlugin extends Plugin {
                 return a.type === 'sleep' ? -1 : 1;
             });
 
-            // Process events in order
+            // Track processed days for progress
+            const processedDays = new Set<string>();
+
+            // Process all events in batches by day
+            let currentDate = '';
+            let currentDay: SleepEvent[] = [];
+
             for (const event of events) {
-                processedDays.add(event.date);
+                if (event.date !== currentDate) {
+                    if (currentDay.length > 0) {
+                        // Process the previous day's events
+                        await this.processDaySleepEvents(currentDay);
+                        processedDays.add(currentDate);
+                        if (progressCallback) {
+                            progressCallback(processedDays.size, totalDays);
+                        }
+                    }
+                    currentDate = event.date;
+                    currentDay = [event];
+                } else {
+                    currentDay.push(event);
+                }
+            }
+
+            // Process the last day
+            if (currentDay.length > 0) {
+                await this.processDaySleepEvents(currentDay);
+                processedDays.add(currentDate);
                 if (progressCallback) {
                     progressCallback(processedDays.size, totalDays);
                 }
-
-                await this.saveMeasurement(event.record);
             }
 
             const dateRangeStr = startDate && endDate
                 ? `from ${startDate} to ${endDate}`
-                : 'from the last 7 days';
+                : `from the last ${this.settings.syncDaysToImport} days`;
             new Notice(`Successfully synced sleep data ${dateRangeStr}`);
         } catch (error) {
             console.error('Failed to sync sleep data:', error);
@@ -470,6 +495,147 @@ export default class SleepTrackerPlugin extends Plugin {
             // Restore original settings
             this.settings.enableJournalEntry = originalJournalSetting;
             this.settings.enableSleepNote = originalSleepNoteSetting;
+        }
+    }
+
+    private async processDaySleepEvents(events: Array<{ type: 'sleep' | 'wake', date: string, time: string, record: MeasurementRecord, sleepData: SleepData }>) {
+        // Add entries based on enabled settings
+        for (const event of events) {
+            // Add to measurement files
+            if (this.settings.enableMeasurementFiles) {
+                await this.measurementService.updateMeasurementFiles(event.record);
+            }
+
+            // Add to journal entry
+            if (this.settings.enableJournalEntry) {
+                await this.journalService.appendToJournal(event.record);
+            }
+
+            // Add to sleep note
+            if (this.settings.enableSleepNote) {
+                await this.journalService.appendToSleepNote(event.record);
+            }
+
+            // Generate sleep event note for wake events with duration
+            if (this.settings.enableSleepEventNotes && event.type === 'wake' && event.record.awakeTime && event.record.sleepDuration) {
+                await this.generateSleepEventNote(event.sleepData);
+            }
+        }
+    }
+
+    private async generateSleepEventNote(sleepData: SleepData) {
+        try {
+            const moment = (window as any).moment;
+            const sleepMoment = moment(sleepData.startTime * 1000);
+            const wakeMoment = moment(sleepData.endTime * 1000);
+            const date = wakeMoment.format('YYYY-MM-DD');  // Use wake date for consistency
+
+            // Use the configured subdirectory format if available, otherwise default to year/month
+            let subDir = '';
+            if (this.settings.sleepEventNotesSubDirectory) {
+                const placeholders = {
+                    YYYY: wakeMoment.format('YYYY'),
+                    MM: wakeMoment.format('MM'),
+                    DD: wakeMoment.format('DD'),
+                    ddd: wakeMoment.format('ddd'),
+                    dddd: wakeMoment.format('dddd'),
+                };
+
+                // Start with the subdirectory format
+                subDir = this.settings.sleepEventNotesSubDirectory;
+
+                // Replace all occurrences of placeholders
+                Object.entries(placeholders).forEach(([key, value]) => {
+                    subDir = subDir.replace(new RegExp(key, 'g'), value);
+                });
+            } else {
+                // Default format if none specified
+                const year = wakeMoment.format('YYYY');
+                const yearMonth = wakeMoment.format('YYYY-MM');
+                subDir = `${year}/${yearMonth}`;
+            }
+
+            const notePath = `${this.settings.sleepNotesFolder}/${subDir}/${date}_Sleep.md`;
+
+            // Check if the file already exists to avoid duplicates
+            const existingFile = this.app.vault.getAbstractFileByPath(notePath);
+            if (existingFile) {
+                return;
+            }
+
+            // Ensure the folder structure exists
+            await this.createFolderStructure(`${this.settings.sleepNotesFolder}/${subDir}`);
+
+            // Format duration for YAML and note body
+            const durationHours = Math.floor(sleepData.sleepDuration);
+            const durationMinutes = Math.round((sleepData.sleepDuration - durationHours) * 60);
+            const durationFormatted = `${durationHours}h ${durationMinutes}m`;
+            const durationYAML = `${durationHours}:${durationMinutes.toString().padStart(2, '0')}`;
+
+            // Calculate sleep stage totals
+            const totalSleepMinutes = (sleepData.deepSleepMinutes || 0) + (sleepData.lightSleepMinutes || 0) + (sleepData.remMinutes || 0);
+            const hasDetailedSleepStages = totalSleepMinutes > 0;
+
+            // Build sleep quality sections conditionally
+            const sleepQualityEntries = [
+                sleepData.efficiency !== undefined ? `📊 Sleep Efficiency: ${(sleepData.efficiency * 100).toFixed(1)}%` : '',
+                sleepData.cycles ? `📶 Sleep Cycles: ${sleepData.cycles}` : '',
+                sleepData.noisePercent !== undefined ? `🔊 Noise Level: ${sleepData.noisePercent.toFixed(1)}%` : '',
+                sleepData.snoringDuration ? `😴 Snoring: ${sleepData.snoringDuration}` : ''
+            ].filter(entry => entry !== '').join('\n');
+
+            // Build sleep stages section conditionally
+            const sleepStagesEntries = hasDetailedSleepStages ? [
+                sleepData.deepSleepMinutes ? `🌑 Deep Sleep:  ${sleepData.deepSleepPercent?.toFixed(1)}% (${sleepData.deepSleepMinutes}m)` : '',
+                sleepData.lightSleepMinutes ? `🌓 Light Sleep: ${(100 - (sleepData.deepSleepPercent || 0)).toFixed(1)}% (${sleepData.lightSleepMinutes}m)` : '',
+                sleepData.remMinutes ? `🌙 REM Sleep:   ${((sleepData.remMinutes / totalSleepMinutes) * 100).toFixed(1)}% (${sleepData.remMinutes}m)` : ''
+            ].filter(entry => entry !== '').join('\n') : 'No detailed sleep stage data available.';
+
+            // Create the note content
+            const noteContent = `---
+type: sleep
+date: ${date}
+filename: ${date}_Sleep
+sleepStartTime: ${sleepMoment.format('HH:mm')}
+sleepEndTime: ${wakeMoment.format('HH:mm')}
+sleepDuration: ${durationYAML}
+sleepLocation: ${sleepData.location || ''}
+sleepCity: ${sleepData.city || ''}
+sleepDeepPercent: ${sleepData.deepSleepPercent !== undefined ? sleepData.deepSleepPercent.toFixed(1) : 'N/A'}
+sleepCycles: ${sleepData.cycles || 'N/A'}
+sleepEfficiency: ${sleepData.efficiency !== undefined ? (sleepData.efficiency * 100).toFixed(1) : 'N/A'}
+sleepNoiseLevel: ${sleepData.noisePercent !== undefined ? sleepData.noisePercent.toFixed(1) : 'N/A'}${sleepData.graph ? `
+sleepGraph: ${sleepData.graph}` : ''}
+created: ${moment().format('YYYY-MM-DDTHH:mm:ssZ')}
+---
+# ${date}: Sleep Data${sleepData.city ? ` from ${sleepData.city}` : ''}
+
+## Sleep Times
+💤 Went to bed at ${sleepMoment.format('HH:mm')} on ${sleepMoment.format('dddd, MMMM D')}
+⏰ Woke up at ${wakeMoment.format('HH:mm')} on ${wakeMoment.format('dddd, MMMM D')}
+⏱️ Total time in bed: ${durationFormatted}
+
+## Sleep Analysis${hasDetailedSleepStages ? `
+
+### Sleep Stages:
+${sleepStagesEntries}` : '\nNo detailed sleep stage data available.'}
+
+### Sleep Quality:
+${sleepQualityEntries}
+
+${sleepData.graph ? `## Sleep Pattern
+
+\`\`\`jots-sleep-tracker
+startTime = ${sleepMoment.format('HH:mm')}
+endTime = ${wakeMoment.format('HH:mm')}
+data = ${sleepData.graph}
+\`\`\`` : ''}${sleepData.comment ? `\n\n${sleepData.comment}` : ''}`;
+
+            const file = await this.app.vault.create(notePath, noteContent);
+            new Notice(`Created sleep note: ${notePath}`);
+        } catch (error) {
+            console.error('Failed to generate sleep note:', error);
+            new Notice('Failed to generate sleep note. Check the console for details.');
         }
     }
 
@@ -487,6 +653,90 @@ export default class SleepTrackerPlugin extends Plugin {
         // Add to sleep note
         if (this.settings.enableSleepNote) {
             await this.journalService.appendToSleepNote(data);
+        }
+
+        // Generate individual sleep event note if enabled and we have a wake event with duration
+        if (this.settings.enableSleepEventNotes && data.awakeTime && data.sleepDuration) {
+            // We need to reconstruct the sleep data from the measurement record
+            const moment = (window as any).moment;
+            const [date, time] = data.date.split(' ');
+            const wakeMoment = moment(`${date} ${data.awakeTime}`, 'YYYY-MM-DD HH:mm');
+            const sleepDuration = parseFloat(data.sleepDuration);
+            const sleepMoment = moment(wakeMoment).subtract(sleepDuration, 'hours');
+
+            const sleepData: SleepData = {
+                startTime: Math.floor(sleepMoment.valueOf() / 1000),
+                endTime: Math.floor(wakeMoment.valueOf() / 1000),
+                sleepDuration: sleepDuration
+            };
+
+            // Use the wake date for the note (same as generateSleepNote)
+            const noteDate = wakeMoment.format('YYYY-MM-DD');
+
+            // Use the configured subdirectory format if available, otherwise default to year/month
+            let subDir = '';
+            if (this.settings.sleepEventNotesSubDirectory) {
+                const placeholders = {
+                    YYYY: wakeMoment.format('YYYY'),
+                    MM: wakeMoment.format('MM'),
+                    DD: wakeMoment.format('DD'),
+                    ddd: wakeMoment.format('ddd'),
+                    dddd: wakeMoment.format('dddd'),
+                };
+
+                // Start with the subdirectory format
+                subDir = this.settings.sleepEventNotesSubDirectory;
+
+                // Replace all occurrences of placeholders, not just the first one
+                Object.entries(placeholders).forEach(([key, value]) => {
+                    subDir = subDir.replace(new RegExp(key, 'g'), value);
+                });
+            } else {
+                // Default format if none specified
+                const year = wakeMoment.format('YYYY');
+                const yearMonth = wakeMoment.format('YYYY-MM');
+                subDir = `${year}/${yearMonth}`;
+            }
+
+            const notePath = `${this.settings.sleepNotesFolder}/${subDir}/${noteDate}_Sleep.md`;
+
+            // Ensure the folder structure exists
+            await this.createFolderStructure(`${this.settings.sleepNotesFolder}/${subDir}`);
+
+            // Format duration for YAML and note body
+            const durationHours = Math.floor(sleepDuration);
+            const durationMinutes = Math.round((sleepDuration - durationHours) * 60);
+            const durationFormatted = `${durationHours}h ${durationMinutes}m`;
+            const durationYAML = `${durationHours}:${durationMinutes.toString().padStart(2, '0')}`;
+
+            // Create the note content
+            const noteContent = `---
+type: sleep
+date: ${noteDate}
+filename: ${noteDate}_Sleep
+sleepStartTime: ${sleepMoment.format('HH:mm')}
+sleepEndTime: ${wakeMoment.format('HH:mm')}
+sleepDuration: ${durationYAML}
+created: ${moment().format('YYYY-MM-DDTHH:mm:ssZ')}
+---
+# ${noteDate}: Sleep Data
+
+## Sleep Times
+💤 Went to bed at ${sleepMoment.format('HH:mm')} on ${sleepMoment.format('dddd, MMMM D')}
+⏰ Woke up at ${wakeMoment.format('HH:mm')} on ${wakeMoment.format('dddd, MMMM D')}
+⏱️ Total time in bed: ${durationFormatted}`;
+
+            try {
+                // Check if the file already exists to avoid duplicates
+                const existingFile = this.app.vault.getAbstractFileByPath(notePath);
+                if (!existingFile) {
+                    const file = await this.app.vault.create(notePath, noteContent);
+                    new Notice(`Created sleep note: ${notePath}`);
+                }
+            } catch (error) {
+                console.error('Failed to generate sleep note:', error);
+                new Notice('Failed to generate sleep note. Check the console for details.');
+            }
         }
     }
 

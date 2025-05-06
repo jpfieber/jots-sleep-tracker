@@ -93,6 +93,7 @@ export interface Settings {
     lastSyncSleepNoteEnabled: boolean;
     lastSyncStartDate?: string;
     lastSyncEndDate?: string;
+    syncDaysToImport: number; // Number of days of sleep data to import at once
 
     // Calendar integration settings
     calendarUrl?: string;
@@ -172,6 +173,7 @@ export const DEFAULT_SETTINGS: Settings = {
     lastSyncSleepNoteEnabled: false,
     lastSyncStartDate: undefined,
     lastSyncEndDate: undefined,
+    syncDaysToImport: 7,  // Default to 7 days
 
     // Calendar integration settings
     calendarUrl: 'https://calendar.google.com/calendar/ical/47871a9405310639ad56ab2c42c8230227232bda03838db99458b32ae2cdbdaa%40group.calendar.google.com/private-fd2c6c754cdfa28b0197606c03bf7abe/basic.ics',
