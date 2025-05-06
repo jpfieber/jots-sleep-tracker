@@ -110,8 +110,12 @@ export class CalendarService {
             }
 
             if (trimmedLine.startsWith('Duration:')) {
-                const duration = this.parseTimeToHours(trimmedLine.substring(9));
-                if (duration) sleepData.sleepDuration = duration;
+                const durationText = trimmedLine.substring(9).trim();
+                const formattedTime = this.parseFormattedTime(durationText);
+                if (formattedTime) {
+                    const duration = this.parseTimeToHours(formattedTime);
+                    if (duration) sleepData.sleepDuration = duration;
+                }
             }
             else if (trimmedLine.startsWith('Deep sleep:')) {
                 const percentMatch = trimmedLine.match(/(\d+(?:\.\d+)?)%/);
@@ -142,9 +146,12 @@ export class CalendarService {
                 }
             }
             else if (trimmedLine.startsWith('Snoring:')) {
-                // Clean and store just the snoring duration text
+                // Extract just the time portion after "Snoring:"
                 const snoringText = trimmedLine.substring(9).trim();
-                sleepData.snoringDuration = snoringText;
+                const formattedTime = this.parseFormattedTime(snoringText);
+                if (formattedTime) {
+                    sleepData.snoringDuration = formattedTime;
+                }
             }
             else if (trimmedLine.startsWith('Comment:')) {
                 // Store clean comment text, excluding any geo tags
@@ -166,11 +173,21 @@ export class CalendarService {
         return sleepData;
     }
 
+    private parseFormattedTime(timeStr: string): string | null {
+        const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})/);
+        if (timeMatch) {
+            // Format with leading zero if needed
+            const hours = timeMatch[1].padStart(2, '0');
+            const minutes = timeMatch[2];
+            return `${hours}:${minutes}`;
+        }
+        return null;
+    }
+
     private parseTimeToHours(timeStr: string): number | null {
-        const match = timeStr.match(/(\d+):(\d+)/);
-        if (match) {
-            const hours = parseInt(match[1]);
-            const minutes = parseInt(match[2]);
+        const formattedTime = this.parseFormattedTime(timeStr);
+        if (formattedTime) {
+            const [hours, minutes] = formattedTime.split(':').map(Number);
             return hours + (minutes / 60);
         }
         return null;
