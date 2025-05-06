@@ -369,7 +369,7 @@ export default class SleepTrackerPlugin extends Plugin {
 
             // Try to get data from calendar first if configured
             if (this.settings.useCalendarForSleepNotes && this.settings.calendarUrl) {
-                const calendarService = new CalendarService(this.settings.calendarUrl);
+                const calendarService = new CalendarService(this.settings.calendarUrl, this.settings);
                 try {
                     sleepMeasurements = await calendarService.getSleepDataForDateRange(startTime, endTime);
                 } catch (error) {
@@ -497,7 +497,7 @@ export default class SleepTrackerPlugin extends Plugin {
 
             // Try calendar first if configured
             if (this.settings.useCalendarForSleepNotes && this.settings.calendarUrl) {
-                const calendarService = new CalendarService(this.settings.calendarUrl);
+                const calendarService = new CalendarService(this.settings.calendarUrl, this.settings);
                 try {
                     sleepData = await calendarService.getLatestSleepData();
                 } catch (error) {

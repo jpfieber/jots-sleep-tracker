@@ -80,6 +80,9 @@ export interface Settings {
     measurementSystem: MeasurementSystem;
     measurements: Measurement[];
 
+    // Location cache
+    locationCache: { [key: string]: string };
+
     // Sleep tracking settings
     trackTotalSleep: boolean;
     trackSleepQuality: boolean;
@@ -160,6 +163,9 @@ export const DEFAULT_SETTINGS: Settings = {
     trackTotalSleep: true,
     trackSleepQuality: true,
     trackSleepStages: true,
+
+    // Location cache
+    locationCache: {},
 
     // Sync settings
     lastSyncJournalEnabled: false,

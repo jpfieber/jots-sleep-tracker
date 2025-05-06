@@ -1,3 +1,5 @@
+import { Settings } from './types';
+
 /**
  * Get the timezone offset in ISO format (e.g. +05:30 or -04:00)
  */
@@ -74,7 +76,7 @@ interface LocationInfo {
  * Convert coordinates to a readable location name using OpenStreetMap's Nominatim service
  * Returns both raw coordinates and formatted city with state/country
  */
-export async function coordsToLocationInfo(location: string): Promise<LocationInfo> {
+export async function coordsToLocationInfo(location: string, settings: Settings): Promise<LocationInfo> {
     try {
         // Check if location has coordinates in format "lat,long"
         const coords = location.split(',').map(n => parseFloat(n.trim()));
@@ -89,10 +91,10 @@ export async function coordsToLocationInfo(location: string): Promise<LocationIn
         const cacheKey = `${lat},${long}`;
 
         // Check cache first
-        if (locationCache[cacheKey]) {
+        if (settings.locationCache[cacheKey]) {
             return {
                 rawCoords: location,
-                formattedLocation: locationCache[cacheKey]
+                formattedLocation: settings.locationCache[cacheKey]
             };
         }
 
@@ -149,7 +151,7 @@ export async function coordsToLocationInfo(location: string): Promise<LocationIn
         const formattedLocation = city && region ? `${city}, ${region}` : (city || location);
 
         // Cache the result
-        locationCache[cacheKey] = formattedLocation;
+        settings.locationCache[cacheKey] = formattedLocation;
 
         return {
             rawCoords: location,

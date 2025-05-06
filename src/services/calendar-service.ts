@@ -1,10 +1,13 @@
 import { request } from 'obsidian';
 import ICAL from 'ical.js';
-import type { SleepData } from '../types';
+import type { SleepData, Settings } from '../types';
 import { coordsToLocationInfo } from '../utils';
 
 export class CalendarService {
-    constructor(private calendarUrl: string) { }
+    constructor(
+        private calendarUrl: string,
+        private settings: Settings
+    ) { }
 
     async getLatestSleepData(): Promise<SleepData | null> {
         try {
@@ -82,7 +85,7 @@ export class CalendarService {
         const endTime = event.endDate.toJSDate().getTime();
         const sleepDuration = (endTime - startTime) / (1000 * 60 * 60); // Convert to hours
 
-        const locationInfo = await coordsToLocationInfo(location?.toString() || '');
+        const locationInfo = await coordsToLocationInfo(location?.toString() || '', this.settings);
 
         // Initialize sleep data with required fields
         const sleepData: SleepData = {
